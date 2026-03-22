@@ -1,0 +1,5 @@
+click>=8.0.0
+pydantic-settings
+structlog
+httpx
+pydantic[email]
