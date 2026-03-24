@@ -33,41 +33,29 @@ int main() {
     }
 
     CaptureDevice capture(Config::data.video.device, Config::data.video.width, Config::data.video.height, Config::data.video.getV4L2Format());
-    bool is_initialized = capture.initialize(Config::data.buffers.count);
-
-    EncoderDevice encoder(Config::data.encoder.device);
-    if (is_initialized) {
-        encoder.initialize(capture.getWidth(), capture.getHeight(), Config::data.video.fps, Config::data.buffers.count);
+    if (!capture.initialize(Config::data.buffers.count)) {
+        std::cerr << "Fatal error: Failed to initialize capture device (no signal?)" << std::endl;
+        return 1;
     }
 
-    std::cerr << "KVM Engine v2.7 (Smart Recovery) started." << std::endl;
+    EncoderDevice encoder(Config::data.encoder.device);
+    if (!encoder.initialize(capture.getWidth(), capture.getHeight(), Config::data.video.fps, Config::data.buffers.count)) {
+        std::cerr << "Fatal error: Failed to initialize encoder device." << std::endl;
+        return 1;
+    }
+
+    std::cerr << "KVM Engine v3.0 (Stream-Managed) started." << std::endl;
 
     struct pollfd fds[2];
-    int consecutive_timeouts = 0;
+    fds[0].fd     = capture.getFd();
+    fds[0].events = POLLIN;
+    fds[1].fd     = encoder.getFd();
+    fds[1].events = POLLIN;
+
+    int timeout_count = 0;
 
     try {
         while (keepRunning) {
-            if (!is_initialized) {
-                uint32_t w, h;
-                if (capture.querySignal(w, h)) {
-                    std::cerr << "Signal detected! Initializing hardware..." << std::endl;
-                    if (capture.initialize(Config::data.buffers.count)) {
-                        encoder.initialize(capture.getWidth(), capture.getHeight(), Config::data.video.fps, Config::data.buffers.count);
-                        is_initialized = true;
-                        consecutive_timeouts = 0;
-                    }
-                }
-                if (!is_initialized) {
-                    sleep(2);
-                    continue;
-                }
-            }
-
-            fds[0].fd     = capture.getFd();
-            fds[0].events = POLLIN;
-            fds[1].fd     = encoder.getFd();
-            fds[1].events = POLLIN;
-
             int ret = poll(fds, 2, 1000);
             
             if (ret < 0) {
@@ -76,20 +64,15 @@ int main() {
             }
 
             if (ret == 0) {
-                consecutive_timeouts++;
-                if (consecutive_timeouts % 5 == 0) {
-                    uint32_t w, h;
-                    if (!capture.querySignal(w, h)) {
-                        std::cerr << "Signal lost. Entering standby mode..." << std::endl;
-                        capture.stopStreaming();
-                        capture.releaseBuffers();
-                        is_initialized = false;
-                    }
+                timeout_count++;
+                if (timeout_count >= 5) {
+                    std::cerr << "Signal lost (timeout). Exiting for restart..." << std::endl;
+                    break; 
                 }
                 continue;
             }
 
-            consecutive_timeouts = 0;
+            timeout_count = 0;
 
             if (fds[0].revents & POLLIN) {
                 uint32_t bytes_used = 0;
@@ -122,7 +105,9 @@ int main() {
         }
     } catch (const std::exception& e) {
         std::cerr << "Runtime Error: " << e.what() << std::endl;
+        return 1;
     }
 
+    std::cerr << "KVM Engine stopped gracefully." << std::endl;
     return 0;
 }

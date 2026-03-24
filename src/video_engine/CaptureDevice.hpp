@@ -22,9 +22,11 @@ private:
     std::vector<Buffer> buffers;
 
     bool openDevice();
+    bool configureFormat();
     bool requestBuffers(uint32_t count);
     bool mapAndQueueBuffers(uint32_t count);
     bool exportBuffers();
+    bool startStreaming();
 
 public:
     CaptureDevice(const std::string& path, uint32_t w, uint32_t h, uint32_t format);
@@ -33,14 +35,8 @@ public:
     uint32_t getWidth() const { return width; }
     uint32_t getHeight() const { return height; }
 
-    bool configureFormat();
+    // Основний метод ініціалізації
     bool initialize(uint32_t count);
-    
-    // Нові методи для динамічного перезапуску
-    void stopStreaming();
-    void releaseBuffers();
-    bool startStreaming();
-    bool querySignal(uint32_t &w, uint32_t &h);
 
     int dequeueBuffer(uint32_t& bytes_used, struct timeval& timestamp);
     bool queueBuffer(int index);

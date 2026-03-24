@@ -7,7 +7,6 @@
 #include <cerrno>
 #include <cstring>
 #include <stdexcept>
-#include <poll.h>
 #include <linux/videodev2.h>
 
 CaptureDevice::CaptureDevice(const std::string& path, uint32_t w, uint32_t h, uint32_t format)
@@ -15,34 +14,30 @@ CaptureDevice::CaptureDevice(const std::string& path, uint32_t w, uint32_t h, ui
 
 CaptureDevice::~CaptureDevice() {
     if (fd != -1) {
-        stopStreaming();
-        releaseBuffers();
+        int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        ioctl(fd, VIDIOC_STREAMOFF, &type);
+        for (auto& buf : buffers) {
+            munmap(buf.start, buf.length);
+            if (buf.export_fd != -1) close(buf.export_fd);
+        }
         close(fd);
     }
 }
 
 bool CaptureDevice::openDevice() {
-    if (fd != -1) return true;
     fd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK, 0);
     return (fd != -1);
 }
 
-bool CaptureDevice::querySignal(uint32_t &w, uint32_t &h) {
+bool CaptureDevice::configureFormat() {
     struct v4l2_dv_timings timings;
     if (ioctl(fd, VIDIOC_QUERY_DV_TIMINGS, &timings) == 0) {
-        w = timings.bt.width;
-        h = timings.bt.height;
-        return (w > 0 && h > 0);
-    }
-    return false;
-}
-
-bool CaptureDevice::configureFormat() {
-    uint32_t w, h;
-    if (querySignal(w, h)) {
-        width = w;
-        height = h;
-        std::cout << "Signal detected: " << width << "x" << height << std::endl;
+        width = timings.bt.width;
+        height = timings.bt.height;
+        std::cerr << "Signal detected: " << width << "x" << height << std::endl;
+    } else {
+        std::cerr << "No HDMI signal detected." << std::endl;
+        return false;
     }
 
     struct v4l2_format fmt = {};
@@ -52,26 +47,11 @@ bool CaptureDevice::configureFormat() {
     fmt.fmt.pix.pixelformat = pixelFormat;
     fmt.fmt.pix.field      = V4L2_FIELD_NONE;
 
-    return (ioctl(fd, VIDIOC_S_FMT, &fmt) != -1);
-}
-
-void CaptureDevice::stopStreaming() {
-    int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    ioctl(fd, VIDIOC_STREAMOFF, &type);
-}
-
-void CaptureDevice::releaseBuffers() {
-    for (auto& buf : buffers) {
-        if (buf.start) munmap(buf.start, buf.length);
-        if (buf.export_fd != -1) close(buf.export_fd);
-    }
-    buffers.clear();
-
-    struct v4l2_requestbuffers req = {};
-    req.count  = 0;
-    req.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    req.memory = V4L2_MEMORY_MMAP;
-    ioctl(fd, VIDIOC_REQBUFS, &req);
+    if (ioctl(fd, VIDIOC_S_FMT, &fmt) == -1) return false;
+    
+    width = fmt.fmt.pix.width;
+    height = fmt.fmt.pix.height;
+    return true;
 }
 
 bool CaptureDevice::requestBuffers(uint32_t count) {
@@ -121,10 +101,6 @@ bool CaptureDevice::startStreaming() {
 
 bool CaptureDevice::initialize(uint32_t count) {
     if (!openDevice()) return false;
-    // Before configuring, ensure we are clean
-    stopStreaming();
-    releaseBuffers();
-    
     if (!configureFormat()) return false;
     if (!requestBuffers(count)) return false;
     if (!mapAndQueueBuffers(count)) return false;
@@ -137,7 +113,6 @@ int CaptureDevice::dequeueBuffer(uint32_t& bytes_used, struct timeval& timestamp
     struct v4l2_buffer buf = {};
     buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
-
     if (ioctl(fd, VIDIOC_DQBUF, &buf) == -1) return -1;
     bytes_used = buf.bytesused;
     timestamp  = buf.timestamp;
