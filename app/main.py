@@ -36,7 +36,7 @@ def run(build: bool, no_hw: bool):
         builder = ProjectBuilder(settings)
         asyncio.run(builder.ensure_dependencies())
         try:
-            builder.build_all()
+            builder.build_all(force_rebuild=True)
             log.info("build_complete")
         except subprocess.CalledProcessError as e:
             log.error("build_failed", error=str(e))

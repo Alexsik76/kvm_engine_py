@@ -271,7 +271,7 @@ func main() {
 	handler := &WSHandler{hid: hid}
 
 	http.Handle("/ws/control", handler)
-	http.HandleFunc("/wake", wakeHandler(hid))
+	http.HandleFunc("/ws/wake", wakeHandler(hid))
 
 	port := fmt.Sprintf(":%d", config.Server.Port)
 	log.Printf("HID Server started on %s", port)

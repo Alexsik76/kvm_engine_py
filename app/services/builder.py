@@ -21,12 +21,12 @@ class ProjectBuilder:
                 response.raise_for_status()
                 (self.include_dir / "json.hpp").write_bytes(response.content)
 
-    def build_all(self):
+    def build_all(self, force_rebuild: bool = False):
         engine_bin = self.settings.project_root / self.settings.kvm_engine_bin
         hid_bin = self.settings.project_root / self.settings.hid_server_bin
 
-        # Check if binaries already exist to skip redundant steps
-        if engine_bin.exists() and hid_bin.exists():
+        # Check if binaries already exist to skip redundant steps, unless forced
+        if not force_rebuild and engine_bin.exists() and hid_bin.exists():
             log.info("binaries_exist", action="skipping_build")
             return
 
