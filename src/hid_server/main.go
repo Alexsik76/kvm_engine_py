@@ -49,9 +49,7 @@ func loadConfig(path string) error {
 }
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 type KeyboardEvent struct {
@@ -67,53 +65,73 @@ type MouseEvent struct {
 }
 
 type HIDManager struct {
-	kbMu    sync.Mutex
-	mouseMu sync.Mutex
-	kbFile  *os.File
-	mFile   *os.File
+	mu     sync.Mutex
+	kbFile *os.File
+	mFile  *os.File
 }
 
 func NewHIDManager() (*HIDManager, error) {
-	kb, err := os.OpenFile(config.Server.KeyboardDevice, os.O_WRONLY|02000, 0666)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open keyboard: %v", err)
+	h := &HIDManager{}
+	if err := h.reopen(); err != nil {
+		return nil, err
 	}
-	m, err := os.OpenFile(config.Server.MouseDevice, os.O_WRONLY|02000, 0666)
+	return h, nil
+}
+
+func (h *HIDManager) reopen() error {
+	if h.kbFile != nil {
+		h.kbFile.Close()
+	}
+	if h.mFile != nil {
+		h.mFile.Close()
+	}
+
+	kb, err := os.OpenFile(config.Server.KeyboardDevice, os.O_WRONLY, 0666)
+	if err != nil {
+		return fmt.Errorf("failed to open keyboard: %v", err)
+	}
+	m, err := os.OpenFile(config.Server.MouseDevice, os.O_WRONLY, 0666)
 	if err != nil {
 		kb.Close()
-		return nil, fmt.Errorf("failed to open mouse: %v", err)
+		return fmt.Errorf("failed to open mouse: %v", err)
 	}
-	return &HIDManager{kbFile: kb, mFile: m}, nil
+
+	h.kbFile = kb
+	h.mFile = m
+	return nil
 }
 
 func (h *HIDManager) SendKeyReport(event KeyboardEvent) error {
-	h.kbMu.Lock()
-	defer h.kbMu.Unlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	report := make([]byte, 8)
 	report[0] = event.Modifiers
 	for i := 0; i < len(event.Keys) && i < 6; i++ {
 		report[i+2] = event.Keys[i]
 	}
-	const maxRetries = 3
-	for i := 0; i < maxRetries; i++ {
-		_, err := h.kbFile.Write(report)
-		if err == nil {
-			return nil
+
+	_, err := h.kbFile.Write(report)
+	if err != nil && (strings.Contains(err.Error(), "shutdown") || strings.Contains(err.Error(), "invalid")) {
+		log.Printf("Detected dead HID handle, reopening...")
+		if h.reopen() == nil {
+			_, err = h.kbFile.Write(report)
 		}
-		if strings.Contains(err.Error(), "EAGAIN") || strings.Contains(err.Error(), "temporarily unavailable") {
-			time.Sleep(time.Duration(10*(i+1)) * time.Millisecond)
-			continue
-		}
-		return err
 	}
-	return nil
+	return err
 }
 
 func (h *HIDManager) SendMouseReport(event MouseEvent) error {
-	h.mouseMu.Lock()
-	defer h.mouseMu.Unlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	report := []byte{event.Buttons, byte(event.X), byte(event.Y), byte(event.Wheel)}
 	_, err := h.mFile.Write(report)
+	if err != nil && (strings.Contains(err.Error(), "shutdown") || strings.Contains(err.Error(), "invalid")) {
+		if h.reopen() == nil {
+			_, err = h.mFile.Write(report)
+		}
+	}
 	return err
 }
 
@@ -123,9 +141,17 @@ func (h *HIDManager) ClearAll() {
 }
 
 func (h *HIDManager) Close() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.ClearAll()
-	h.kbFile.Close()
-	h.mFile.Close()
+	if h.kbFile != nil { h.kbFile.Close() }
+	if h.mFile != nil { h.mFile.Close() }
+}
+
+func (h *HIDManager) ForceReset() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.reopen()
 }
 
 type WSHandler struct {
@@ -134,36 +160,23 @@ type WSHandler struct {
 
 func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(rw, r, nil)
-	if err != nil {
-		log.Printf("WS Upgrade error: %v", err)
-		return
-	}
-	defer func() {
-		conn.Close()
-		w.hid.ClearAll()
-	}()
+	if err != nil { return }
+	defer conn.Close()
+	
 	for {
 		_, message, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
+		if err != nil { break }
 		var generic map[string]interface{}
-		if err := json.Unmarshal(message, &generic); err != nil {
-			continue
-		}
+		if err := json.Unmarshal(message, &generic); err != nil { continue }
 		msgType, _ := generic["type"].(string)
-		dataObj, ok := generic["data"]
-		if !ok {
-			continue
-		}
+		dataObj, ok := generic["data"]; if !ok { continue }
 		dataBytes, _ := json.Marshal(dataObj)
+
 		switch msgType {
 		case "keyboard":
 			var kb KeyboardEvent
 			if err := json.Unmarshal(dataBytes, &kb); err == nil {
-				if err := w.hid.SendKeyReport(kb); err != nil {
-					conn.WriteJSON(map[string]string{"type": "reset_hid"})
-				}
+				w.hid.SendKeyReport(kb)
 			}
 		case "mouse":
 			var m MouseEvent
@@ -180,38 +193,30 @@ func wakeHandler(hid *HIDManager) http.HandlerFunc {
 		const udcFile = "/sys/kernel/config/usb_gadget/kvm_gadget/UDC"
 		const udcName = "fe980000.usb"
 
-		// 1. Hardware Wake (UDC Rebind)
 		os.WriteFile(udcFile, []byte("\n"), 0644)
 		time.Sleep(1 * time.Second)
 		os.WriteFile(udcFile, []byte(udcName), 0644)
 		
-		log.Printf("Hardware woke up. Waiting for OS to enumerate HID...")
+		log.Printf("Hardware reset complete. Re-opening device handles...")
+		time.Sleep(2 * time.Second)
 		
-		// 2. Wait for OS to recognize the "newly plugged" keyboard
-		time.Sleep(3 * time.Second)
+		// Ключовий момент: примусово перевідкриваємо файли після Rebind
+		hid.ForceReset()
 
-		// 3. Monitor/Video Wake (Send ENTER key)
-		log.Printf("Sending ENTER to wake up video signal...")
-		
-		// Press Enter (Usage ID 0x28)
+		log.Printf("Sending ENTER to wake up monitor...")
 		hid.SendKeyReport(KeyboardEvent{Modifiers: 0, Keys: []byte{0x28}})
 		time.Sleep(100 * time.Millisecond)
-		hid.ClearAll() // Release key
+		hid.ClearAll()
 
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ok","message":"full wake cycle complete"}`)
+		fmt.Fprintf(w, `{"status":"ok"}`)
 	}
 }
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	if err := loadConfig(""); err != nil {
-		log.Fatalf("Config failure: %v", err)
-	}
-	hid, err := NewHIDManager()
-	if err != nil {
-		log.Fatalf("HID failure: %v", err)
-	}
+	loadConfig("")
+	hid, _ := NewHIDManager()
 	defer hid.Close()
 
 	http.Handle("/ws/control", &WSHandler{hid: hid})
@@ -219,8 +224,6 @@ func main() {
 	http.HandleFunc("/ws/wake", wakeHandler(hid))
 
 	port := fmt.Sprintf(":%d", config.Server.Port)
-	log.Printf("HID Server v3.2 (Fixed) starting on %s", port)
-	if err := http.ListenAndServe(port, nil); err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("HID Server v3.3 (Auto-Reconnect) starting on %s", port)
+	http.ListenAndServe(port, nil)
 }
