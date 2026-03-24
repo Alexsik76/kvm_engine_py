@@ -12,7 +12,6 @@
 std::atomic<bool> keepRunning(true);
 
 void signalHandler(int signum) {
-    std::cerr << "\nInterrupt signal (" << signum << ") received." << std::endl;
     keepRunning = false;
 }
 
@@ -20,11 +19,8 @@ int main() {
     std::signal(SIGINT, signalHandler);
     std::signal(SIGTERM, signalHandler);
 
-    // Get executable directory for config path
     std::filesystem::path exePath = std::filesystem::read_symlink("/proc/self/exe").parent_path();
     std::string configPath = (exePath / "config" / "config.json").string();
-    
-    // Also check current directory as fallback
     if (!std::filesystem::exists(configPath)) {
         configPath = "./config/config.json";
     }
@@ -41,15 +37,14 @@ int main() {
         std::cerr << "Fatal error: Failed to initialize capture device." << std::endl;
         return 1;
     }
-    std::cerr << "Capture initialised." << std::endl;
 
     EncoderDevice encoder(Config::data.encoder.device);
     if (!encoder.initialize(capture.getWidth(), capture.getHeight(), Config::data.video.fps, Config::data.buffers.count)) {
         std::cerr << "Fatal error: Failed to initialize encoder device." << std::endl;
         return 1;
     }
-    std::cerr << "KVM Engine v2.5 (No-Timeout Mode) started." << std::endl;
-    std::cerr << "Streaming raw H.264 to stdout... Press Ctrl+C to stop." << std::endl;
+
+    std::cerr << "KVM Engine v2.6 (Auto-Recovery) started." << std::endl;
 
     struct pollfd fds[2];
     fds[0].fd     = capture.getFd();
@@ -57,30 +52,33 @@ int main() {
     fds[1].fd     = encoder.getFd();
     fds[1].events = POLLIN;
 
+    int consecutive_timeouts = 0;
+
     try {
         while (keepRunning) {
-            int ret = poll(fds, 2, 1000); // 1s timeout for lower CPU when idle
+            int ret = poll(fds, 2, 1000);
             
             if (ret < 0) {
                 if (errno == EINTR) continue; 
-                std::cerr << "poll() error in main loop." << std::endl;
                 break;
             }
 
             if (ret == 0) {
-                // Keep the process alive even if there's no signal.
-                // This prevents MediaMTX from dropping the stream source.
+                consecutive_timeouts++;
+                // Every 5 seconds of no signal, try to "kick" the hardware timings
+                if (consecutive_timeouts % 5 == 0) {
+                    std::cerr << "No signal... waiting for host to wake up." << std::endl;
+                    // Trigger a re-query of timings in the driver
+                    capture.configureFormat(); 
+                }
                 continue;
             }
 
-            if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-                std::cerr << "Capture device disconnected or fatal hardware error. Exiting." << std::endl;
-                break;
-            }
+            consecutive_timeouts = 0;
 
             if (fds[0].revents & POLLIN) {
-                uint32_t       bytes_used = 0;
-                struct timeval cap_ts     = {};
+                uint32_t bytes_used = 0;
+                struct timeval cap_ts = {};
                 int cap_idx = capture.dequeueBuffer(bytes_used, cap_ts);
                 if (cap_idx != -1) {
                     int dmabuf_fd = capture.getExportFd(cap_idx);
@@ -88,15 +86,14 @@ int main() {
                 }
             }
 
-            // Internal feedback loop
             int enc_out_idx = encoder.dequeueOutputBuffer();
             if (enc_out_idx != -1) {
                 capture.queueBuffer(enc_out_idx);
             }
 
             if (fds[1].revents & POLLIN) {
-                uint32_t       h264_bytes = 0;
-                struct timeval enc_ts     = {};
+                uint32_t h264_bytes = 0;
+                struct timeval enc_ts = {};
                 int enc_cap_idx = encoder.dequeueCaptureBuffer(h264_bytes, enc_ts);
                 if (enc_cap_idx != -1) {
                     void* frame_data = encoder.getCaptureBufferPointer(enc_cap_idx);
@@ -109,10 +106,8 @@ int main() {
             }
         }
     } catch (const std::exception& e) {
-        std::cerr << "Runtime Exception: " << e.what() << std::endl;
-        return 1;
+        std::cerr << "Runtime Error: " << e.what() << std::endl;
     }
 
-    std::cerr << "KVM Engine stopped gracefully." << std::endl;
     return 0;
 }
