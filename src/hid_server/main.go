@@ -177,14 +177,36 @@ func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 func wakeHandler(hid *HIDManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("HTTP Wake request received from %s on path %s", r.RemoteAddr, r.URL.Path)
+		
+		// Try to trigger USB SRP via sysfs to re-activate the gadget
+		files, _ := filepath.Glob("/sys/class/udc/*/srp")
+		for _, f := range files {
+			os.WriteFile(f, []byte("1"), 0200)
+		}
+		time.Sleep(200 * time.Millisecond)
+
 		kbEvent := KeyboardEvent{Modifiers: 0x02, Keys: []byte{}}
-		if err := hid.SendKeyReport(kbEvent); err != nil {
-			log.Printf("Wake failed: %v", err)
-			http.Error(w, "HID write failed", 500)
+		var err error
+		
+		// Retry writing up to 3 times in case the gadget is still re-initializing
+		for i := 0; i < 3; i++ {
+			err = hid.SendKeyReport(kbEvent)
+			if err == nil {
+				break
+			}
+			log.Printf("Wake attempt %d failed: %v. Retrying...", i+1, err)
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		if err != nil {
+			log.Printf("Wake failed after retries: %v", err)
+			http.Error(w, fmt.Sprintf("HID write failed: %v", err), 500)
 			return
 		}
+		
 		time.Sleep(100 * time.Millisecond)
 		hid.ClearAll()
+		
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"status":"ok"}`)
 		log.Printf("Wake signal sent successfully")
