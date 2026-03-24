@@ -144,8 +144,12 @@ func (h *HIDManager) Close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.ClearAll()
-	if h.kbFile != nil { h.kbFile.Close() }
-	if h.mFile != nil { h.mFile.Close() }
+	if h.kbFile != nil {
+		h.kbFile.Close()
+	}
+	if h.mFile != nil {
+		h.mFile.Close()
+	}
 }
 
 func (h *HIDManager) ForceReset() {
@@ -160,28 +164,48 @@ type WSHandler struct {
 
 func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(rw, r, nil)
-	if err != nil { return }
+	if err != nil {
+		log.Printf("WS Upgrade error: %v", err)
+		return
+	}
 	defer conn.Close()
-	
+
 	for {
 		_, message, err := conn.ReadMessage()
-		if err != nil { break }
+		if err != nil {
+			break
+		}
 		var generic map[string]interface{}
-		if err := json.Unmarshal(message, &generic); err != nil { continue }
+		if err := json.Unmarshal(message, &generic); err != nil {
+			log.Printf("JSON Unmarshal error: %v", err)
+			continue
+		}
 		msgType, _ := generic["type"].(string)
-		dataObj, ok := generic["data"]; if !ok { continue }
-		dataBytes, _ := json.Marshal(dataObj)
+		dataObj, ok := generic["data"]
+		if !ok {
+			log.Printf("Missing 'data' field in WS message")
+			continue
+		}
+		dataBytes, err := json.Marshal(dataObj)
+		if err != nil {
+			log.Printf("JSON Marshal error: %v", err)
+			continue
+		}
 
 		switch msgType {
 		case "keyboard":
 			var kb KeyboardEvent
 			if err := json.Unmarshal(dataBytes, &kb); err == nil {
 				w.hid.SendKeyReport(kb)
+			} else {
+				log.Printf("Failed to unmarshal KeyboardEvent: %v", err)
 			}
 		case "mouse":
 			var m MouseEvent
 			if err := json.Unmarshal(dataBytes, &m); err == nil {
 				w.hid.SendMouseReport(m)
+			} else {
+				log.Printf("Failed to unmarshal MouseEvent: %v", err)
 			}
 		}
 	}
@@ -189,41 +213,48 @@ func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 func wakeHandler(hid *HIDManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("HTTP Wake request received")
+		log.Printf("HTTP Wake request received from %s", r.RemoteAddr)
 		const udcFile = "/sys/kernel/config/usb_gadget/kvm_gadget/UDC"
 		const udcName = "fe980000.usb"
 
-		os.WriteFile(udcFile, []byte("\n"), 0644)
+		// Magic Wake Sequence
+		_ = os.WriteFile(udcFile, []byte("\n"), 0644)
 		time.Sleep(1 * time.Second)
-		os.WriteFile(udcFile, []byte(udcName), 0644)
-		
+		_ = os.WriteFile(udcFile, []byte(udcName), 0644)
+
 		log.Printf("Hardware reset complete. Re-opening device handles...")
 		time.Sleep(2 * time.Second)
-		
-		// Ключовий момент: примусово перевідкриваємо файли після Rebind
+
 		hid.ForceReset()
 
 		log.Printf("Sending ENTER to wake up monitor...")
-		hid.SendKeyReport(KeyboardEvent{Modifiers: 0, Keys: []byte{0x28}})
+		_ = hid.SendKeyReport(KeyboardEvent{Modifiers: 0, Keys: []byte{0x28}})
 		time.Sleep(100 * time.Millisecond)
 		hid.ClearAll()
 
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ok"}`)
+		_, _ = fmt.Fprintf(w, `{"status":"ok","message":"Magic Wake cycle complete"}`)
 	}
 }
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	loadConfig("")
-	hid, _ := NewHIDManager()
+	if err := loadConfig(""); err != nil {
+		log.Fatalf("Config failure: %v", err)
+	}
+	hid, err := NewHIDManager()
+	if err != nil {
+		log.Fatalf("HID failure: %v", err)
+	}
 	defer hid.Close()
 
 	http.Handle("/ws/control", &WSHandler{hid: hid})
-	http.HandleFunc("/wake", wakeHandler(hid))
+	// Only /ws/wake is exposed through the tunnel
 	http.HandleFunc("/ws/wake", wakeHandler(hid))
 
 	port := fmt.Sprintf(":%d", config.Server.Port)
-	log.Printf("HID Server v3.3 (Auto-Reconnect) starting on %s", port)
-	http.ListenAndServe(port, nil)
+	log.Printf("HID Server v3.4 (Lean & Audit-Cleaned) starting on %s", port)
+	if err := http.ListenAndServe(port, nil); err != nil {
+		log.Fatal(err)
+	}
 }
