@@ -162,6 +162,27 @@ class HardwareManager:
         except Exception as e:
             log.error("hardware_v4l2_fmt_failed", error=str(e))
 
+    def force_rebind_gadget(self):
+        """Force a virtual unplug/replug of the USB gadget to recover from shutdown states."""
+        udc_controllers = os.listdir("/sys/class/udc")
+        if not udc_controllers:
+            return
+        
+        udc_name = udc_controllers[0]
+        udc_file = self.gadget_path / "UDC"
+        
+        try:
+            log.info("hardware_gadget_rebind_start", udc=udc_name)
+            # 1. Unbind
+            udc_file.write_text("\n")
+            import time
+            time.sleep(0.5)
+            # 2. Bind again
+            udc_file.write_text(udc_name)
+            log.info("hardware_gadget_rebind_complete")
+        except Exception as e:
+            log.error("hardware_gadget_rebind_failed", error=str(e))
+
     def wake_host(self):
         """Ported logic from wake_host.sh"""
         log.info("hardware_wake_host_signal")

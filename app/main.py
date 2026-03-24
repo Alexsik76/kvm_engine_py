@@ -69,6 +69,8 @@ def wake():
     """Send a wakeup signal to the host OS"""
     settings = Settings()
     hw_manager = HardwareManager(settings)
+    # Force re-bind gadget to recover from 'endpoint shutdown'
+    hw_manager.force_rebind_gadget()
     hw_manager.wake_host()
 
 if __name__ == "__main__":
