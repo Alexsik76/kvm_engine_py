@@ -44,15 +44,13 @@ int main() {
         return 1;
     }
 
-    std::cerr << "KVM Engine v3.0 (Stream-Managed) started." << std::endl;
+    std::cerr << "KVM Engine v3.1 (Reactive) started." << std::endl;
 
     struct pollfd fds[2];
     fds[0].fd     = capture.getFd();
     fds[0].events = POLLIN;
     fds[1].fd     = encoder.getFd();
     fds[1].events = POLLIN;
-
-    int timeout_count = 0;
 
     try {
         while (keepRunning) {
@@ -64,15 +62,15 @@ int main() {
             }
 
             if (ret == 0) {
-                timeout_count++;
-                if (timeout_count >= 5) {
-                    std::cerr << "Signal lost (timeout). Exiting for restart..." << std::endl;
-                    break; 
+                // Poll timeout: check if HDMI signal is still physically connected
+                struct v4l2_dv_timings timings;
+                if (ioctl(capture.getFd(), VIDIOC_QUERY_DV_TIMINGS, &timings) != 0) {
+                    std::cerr << "Signal physically lost. Exiting for MediaMTX restart..." << std::endl;
+                    return 1; 
                 }
+                // Signal is active, just wait for hardware to produce frames
                 continue;
             }
-
-            timeout_count = 0;
 
             if (fds[0].revents & POLLIN) {
                 uint32_t bytes_used = 0;
@@ -108,6 +106,5 @@ int main() {
         return 1;
     }
 
-    std::cerr << "KVM Engine stopped gracefully." << std::endl;
     return 0;
 }

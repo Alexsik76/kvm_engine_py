@@ -32,9 +32,14 @@ bool CaptureDevice::openDevice() {
 bool CaptureDevice::configureFormat() {
     struct v4l2_dv_timings timings;
     if (ioctl(fd, VIDIOC_QUERY_DV_TIMINGS, &timings) == 0) {
+        // Apply the timings we just queried
+        if (ioctl(fd, VIDIOC_S_DV_TIMINGS, &timings) == -1) {
+            std::cerr << "Failed to set DV timings." << std::endl;
+            return false;
+        }
         width = timings.bt.width;
         height = timings.bt.height;
-        std::cerr << "Signal detected: " << width << "x" << height << std::endl;
+        std::cerr << "Signal detected and applied: " << width << "x" << height << std::endl;
     } else {
         std::cerr << "No HDMI signal detected." << std::endl;
         return false;
