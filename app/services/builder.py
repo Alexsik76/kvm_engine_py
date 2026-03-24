@@ -8,7 +8,7 @@ log = structlog.get_logger()
 class ProjectBuilder:
     def __init__(self, settings):
         self.settings = settings
-        self.include_dir = Path(settings.project_root) / "include" / "nlohmann"
+        self.include_dir = self.settings.project_root / "src" / "video_engine" / "include" / "nlohmann"
         self.json_url = "https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp"
 
     async def ensure_dependencies(self):
@@ -22,21 +22,30 @@ class ProjectBuilder:
                 (self.include_dir / "json.hpp").write_bytes(response.content)
 
     def build_all(self):
-        engine_bin = Path(self.settings.project_root) / "kvm_engine"
-        hid_bin = Path(self.settings.hid_server_bin)
+        engine_bin = self.settings.project_root / self.settings.kvm_engine_bin
+        hid_bin = self.settings.project_root / self.settings.hid_server_bin
 
         # Check if binaries already exist to skip redundant steps
         if engine_bin.exists() and hid_bin.exists():
             log.info("binaries_exist", action="skipping_build")
             return
 
+        log.info("build_starting", engine=str(engine_bin), hid=str(hid_bin))
+
+        # Build C++ Video Engine (Core)
+        cpp_source_dir = self.settings.project_root / "src" / "video_engine"
+        cpp_include_dir = cpp_source_dir / "include"
         cpp_cmd = [
             "g++", "-O3", "-mcpu=cortex-a72", "-mtune=cortex-a72", "-flto=auto",
-            "-I", str(Path(self.settings.project_root) / "include"),
-            "src/main.cpp", "src/CaptureDevice.cpp", "src/EncoderDevice.cpp", "src/Config.cpp",
+            "-I", str(cpp_include_dir),
+            str(cpp_source_dir / "main.cpp"), 
+            str(cpp_source_dir / "CaptureDevice.cpp"), 
+            str(cpp_source_dir / "EncoderDevice.cpp"), 
+            str(cpp_source_dir / "Config.cpp"),
             "-o", str(engine_bin)
         ]
         subprocess.run(cpp_cmd, cwd=self.settings.project_root, check=True)
 
+        # Build Go HID Server
         go_cmd = ["go", "build", "-o", str(hid_bin), "main.go"]
-        subprocess.run(go_cmd, cwd=Path(self.settings.project_root) / "src" / "hid_server", check=True)
+        subprocess.run(go_cmd, cwd=self.settings.project_root / "src" / "hid_server", check=True)
