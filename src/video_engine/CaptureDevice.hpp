@@ -30,7 +30,6 @@ private:
 
     // These are now private internal steps
     bool openDevice();
-    bool configureFormat();
     bool requestBuffers(uint32_t count);
     bool mapAndQueueBuffers(uint32_t count);
     bool exportBuffers();
@@ -43,6 +42,7 @@ public:
     uint32_t getWidth() const { return width; }
     uint32_t getHeight() const { return height; }
 
+    bool configureFormat();
     // Single public method for complete setup
     bool initialize(uint32_t count);
 
