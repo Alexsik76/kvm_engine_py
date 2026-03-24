@@ -113,58 +113,54 @@ class HardwareManager:
             pass
 
     async def init_v4l2(self):
-        """Ported logic from init_kvm.sh"""
+        """Ported logic from init_kvm.sh - Non-blocking version"""
         log.info("hardware_v4l2_init", device=self.settings.video_device)
         
-        # 1. Load EDID
-        if self.settings.edid_path.exists():
-            # Use raw format for v4l2-ctl if needed, init_kvm.sh says format=raw
-            subprocess.run(["v4l2-ctl", "-d", self.settings.video_device, "--set-edid", f"pad=0,file={self.settings.edid_path},format=raw"], check=True)
-        else:
-            log.warning("hardware_edid_missing", path=str(self.settings.edid_path))
+        # 1. Load EDID (always do this to ensure host sees a monitor)
+        try:
+            if self.settings.edid_path.exists():
+                subprocess.run(["v4l2-ctl", "-d", self.settings.video_device, "--set-edid", f"pad=0,file={self.settings.edid_path},format=raw"], check=True)
+                log.info("hardware_edid_loaded")
+            else:
+                log.warning("hardware_edid_missing", path=str(self.settings.edid_path))
+        except Exception as e:
+            log.warning("hardware_edid_failed", error=str(e))
 
-        # 2. Wait for stable video signal
-        log.info("hardware_v4l2_waiting_signal")
-        while True:
-            try:
-                result = subprocess.run(
-                    ["v4l2-ctl", "-d", self.settings.video_device, "--query-dv-timings"],
-                    capture_output=True, text=True, check=False
-                )
-                if "Active width" in result.stdout:
-                    width_line = [line for line in result.stdout.split('\n') if "Active width" in line]
-                    if width_line:
-                        width_val = width_line[0].split(':')[1].strip()
-                        if int(width_val) > 0:
-                            break
-            except Exception:
-                pass
-            await asyncio.sleep(1)
-
-        # 3. Query DV timings
-        subprocess.run(["v4l2-ctl", "-d", self.settings.video_device, "--set-dv-bt-timings", "query"], check=False)
-
-        # 4. Get detected resolution
+        # 2. Check for signal once (don't wait)
+        log.info("hardware_v4l2_checking_signal")
         result = subprocess.run(
             ["v4l2-ctl", "-d", self.settings.video_device, "--query-dv-timings"],
             capture_output=True, text=True, check=False
         )
         
+        has_signal = "Active width" in result.stdout
+        
+        if has_signal:
+            log.info("hardware_v4l2_signal_found")
+            # 3. Apply timings if signal exists
+            subprocess.run(["v4l2-ctl", "-d", self.settings.video_device, "--set-dv-bt-timings", "query"], check=False)
+        else:
+            log.info("hardware_v4l2_no_signal_yet", message="Starting services anyway to allow HID wake")
+
+        # 4. Set fallback or detected resolution
+        # Even without signal, we set a default format so the driver is initialized
         width = 1280
         height = 720
-        for line in result.stdout.split('\n'):
-            if "Active width" in line:
-                width = int(line.split(':')[1].strip())
-            elif "Active height" in line:
-                height = int(line.split(':')[1].strip())
+        if has_signal:
+            for line in result.stdout.split('\n'):
+                if "Active width" in line:
+                    width = int(line.split(':')[1].strip())
+                elif "Active height" in line:
+                    height = int(line.split(':')[1].strip())
 
-        # 5. Set pixel format and resolution
-        subprocess.run([
-            "v4l2-ctl", "-d", self.settings.video_device, 
-            f"--set-fmt-video=width={width},height={height},pixelformat=UYVY"
-        ], check=True)
-        
-        log.info("hardware_v4l2_complete", resolution=f"{width}x{height}")
+        try:
+            subprocess.run([
+                "v4l2-ctl", "-d", self.settings.video_device, 
+                f"--set-fmt-video=width={width},height={height},pixelformat=UYVY"
+            ], check=True)
+            log.info("hardware_v4l2_initialized", resolution=f"{width}x{height}")
+        except Exception as e:
+            log.error("hardware_v4l2_fmt_failed", error=str(e))
 
     def wake_host(self):
         """Ported logic from wake_host.sh"""
