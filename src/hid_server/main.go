@@ -25,20 +25,15 @@ type Config struct {
 var config Config
 
 func getConfigPath() string {
-	// Check environment variable first
 	if envPath := os.Getenv("KVM_CONFIG"); envPath != "" {
 		return envPath
 	}
-
-	// Try executable directory first
 	if exePath, err := os.Executable(); err == nil {
 		configPath := filepath.Join(filepath.Dir(exePath), "config", "config.json")
 		if _, err := os.Stat(configPath); err == nil {
 			return configPath
 		}
 	}
-
-	// Fallback to current working directory
 	return "./config/config.json"
 }
 
@@ -60,9 +55,8 @@ var upgrader = websocket.Upgrader{
 }
 
 type KeyboardEvent struct {
-	Modifiers byte `json:"modifiers"`
-	// Go's encoding/json automatically decodes Base64 strings into []byte
-	Keys []byte `json:"keys"`
+	Modifiers byte   `json:"modifiers"`
+	Keys      []byte `json:"keys"`
 }
 
 type MouseEvent struct {
@@ -84,46 +78,32 @@ func NewHIDManager() (*HIDManager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open keyboard: %v", err)
 	}
-
 	m, err := os.OpenFile(config.Server.MouseDevice, os.O_WRONLY|02000, 0666)
 	if err != nil {
 		kb.Close()
 		return nil, fmt.Errorf("failed to open mouse: %v", err)
 	}
-
-	return &HIDManager{
-		kbFile: kb,
-		mFile:  m,
-	}, nil
+	return &HIDManager{kbFile: kb, mFile: m}, nil
 }
 
 func (h *HIDManager) SendKeyReport(event KeyboardEvent) error {
 	h.kbMu.Lock()
 	defer h.kbMu.Unlock()
-
 	report := make([]byte, 8)
 	report[0] = event.Modifiers
-
 	for i := 0; i < len(event.Keys) && i < 6; i++ {
 		report[i+2] = event.Keys[i]
 	}
-
 	const maxRetries = 3
 	for i := 0; i < maxRetries; i++ {
 		_, err := h.kbFile.Write(report)
 		if err == nil {
 			return nil
 		}
-
-		// EAGAIN means host is busy/not reading. Retry for keyboard reliability.
-		if strings.Contains(err.Error(), "resource temporarily unavailable") || strings.Contains(err.Error(), "EAGAIN") {
-			if i < maxRetries-1 {
-				time.Sleep(time.Duration(10*(i+1)) * time.Millisecond)
-				continue
-			}
+		if strings.Contains(err.Error(), "EAGAIN") || strings.Contains(err.Error(), "temporarily unavailable") {
+			time.Sleep(time.Duration(10*(i+1)) * time.Millisecond)
+			continue
 		}
-
-		log.Printf("Keyboard write fatal error (after %d retries): %v", i+1, err)
 		return err
 	}
 	return nil
@@ -132,22 +112,12 @@ func (h *HIDManager) SendKeyReport(event KeyboardEvent) error {
 func (h *HIDManager) SendMouseReport(event MouseEvent) error {
 	h.mouseMu.Lock()
 	defer h.mouseMu.Unlock()
-
 	report := []byte{event.Buttons, byte(event.X), byte(event.Y), byte(event.Wheel)}
-
 	_, err := h.mFile.Write(report)
-	if err != nil {
-		// Mouse is fire-and-forget. Ignore EAGAIN to prevent blocking or network spam.
-		if strings.Contains(err.Error(), "resource temporarily unavailable") || strings.Contains(err.Error(), "EAGAIN") {
-			return nil
-		}
-		log.Printf("Mouse write error: %v", err)
-	}
 	return err
 }
 
 func (h *HIDManager) ClearAll() {
-	// Release all keys and mouse buttons just in case
 	h.SendKeyReport(KeyboardEvent{Modifiers: 0, Keys: []byte{}})
 	h.SendMouseReport(MouseEvent{Buttons: 0, X: 0, Y: 0, Wheel: 0})
 }
@@ -168,113 +138,77 @@ func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		log.Printf("WS Upgrade error: %v", err)
 		return
 	}
-
 	log.Println("New control session established from", r.RemoteAddr)
-
-	// Cleanup on exit
 	defer func() {
 		conn.Close()
 		log.Println("Connection closed, clearing HID state for:", r.RemoteAddr)
-		// Crucial: Release all keys so they don't get stuck!
 		w.hid.ClearAll()
 	}()
-
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("Read error or connection closed: %v", err)
 			break
 		}
-
 		var generic map[string]interface{}
 		if err := json.Unmarshal(message, &generic); err != nil {
-			log.Printf("JSON Parse error: %v", err)
 			continue
 		}
-
-		msgType, ok := generic["type"].(string)
-		if !ok {
-			log.Printf("Error: 'type' field is missing or not a string")
-			continue
-		}
-
+		msgType, _ := generic["type"].(string)
 		dataObj, ok := generic["data"]
 		if !ok {
-			log.Printf("Error: 'data' field is missing")
 			continue
 		}
-
-		// Fast path if it's already a map
-		// But re-marshaling is safe too
-		dataBytes, err := json.Marshal(dataObj)
-		if err != nil {
-			log.Printf("Error re-marshaling the 'data' object: %v", err)
-			continue
-		}
-
+		dataBytes, _ := json.Marshal(dataObj)
 		switch msgType {
 		case "keyboard":
 			var kb KeyboardEvent
-			if err := json.Unmarshal(dataBytes, &kb); err != nil {
-				log.Printf("Failed to map JSON to KeyboardEvent struct: %v", err)
-			} else {
-				// If keyboard write fails after retries, send NACK to frontend
-				if err := w.hid.SendKeyReport(kb); err != nil {
-					conn.WriteJSON(map[string]string{"type": "reset_hid"})
-				}
+			json.Unmarshal(dataBytes, &kb)
+			if err := w.hid.SendKeyReport(kb); err != nil {
+				conn.WriteJSON(map[string]string{"type": "reset_hid"})
 			}
 		case "mouse":
 			var m MouseEvent
-			if err := json.Unmarshal(dataBytes, &m); err != nil {
-				log.Printf("Failed to map JSON to MouseEvent struct: %v", err)
-			} else {
-				w.hid.SendMouseReport(m)
-			}
-		default:
-			log.Printf("Unknown message type received: %s", msgType)
+			json.Unmarshal(dataBytes, &m)
+			w.hid.SendMouseReport(m)
 		}
 	}
 }
 
 func wakeHandler(hid *HIDManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Manual wake request received via HTTP from %s", r.RemoteAddr)
-		
-		// Left Shift press (modifier 0x02, empty key list)
+		log.Printf("HTTP Wake request received from %s on path %s", r.RemoteAddr, r.URL.Path)
 		kbEvent := KeyboardEvent{Modifiers: 0x02, Keys: []byte{}}
 		if err := hid.SendKeyReport(kbEvent); err != nil {
-			http.Error(w, "Failed to send HID report", http.StatusInternalServerError)
+			log.Printf("Wake failed: %v", err)
+			http.Error(w, "HID write failed", 500)
 			return
 		}
-		
 		time.Sleep(100 * time.Millisecond)
-		
-		// Release
 		hid.ClearAll()
-		
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ok","message":"wake signal sent"}`)
+		fmt.Fprintf(w, `{"status":"ok"}`)
+		log.Printf("Wake signal sent successfully")
 	}
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	if err := loadConfig(""); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("Config failure: %v", err)
 	}
-
 	hid, err := NewHIDManager()
 	if err != nil {
-		log.Fatalf("Critical HID failure: %v", err)
+		log.Fatalf("HID failure: %v", err)
 	}
 	defer hid.Close()
 
-	handler := &WSHandler{hid: hid}
-
-	http.Handle("/ws/control", handler)
+	http.Handle("/ws/control", &WSHandler{hid: hid})
+	// Слухаємо обидва варіанти для надійності
+	http.HandleFunc("/wake", wakeHandler(hid))
 	http.HandleFunc("/ws/wake", wakeHandler(hid))
 
 	port := fmt.Sprintf(":%d", config.Server.Port)
-	log.Printf("HID Server started on %s", port)
+	log.Printf("HID Server v2.1 (WS-compatible) starting on %s", port)
 	if err := http.ListenAndServe(port, nil); err != nil {
 		log.Fatal(err)
 	}

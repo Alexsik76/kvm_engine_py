@@ -48,6 +48,7 @@ int main() {
         std::cerr << "Fatal error: Failed to initialize encoder device." << std::endl;
         return 1;
     }
+    std::cerr << "KVM Engine v2.5 (No-Timeout Mode) started." << std::endl;
     std::cerr << "Streaming raw H.264 to stdout... Press Ctrl+C to stop." << std::endl;
 
     struct pollfd fds[2];
