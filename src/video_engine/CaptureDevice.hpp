@@ -2,16 +2,9 @@
 #define CAPTURE_DEVICE_HPP
 
 #include <string>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-#include <linux/videodev2.h>
-#include <iostream>
-#include <cstdint>
-#include <sys/mman.h>
 #include <vector>
-#include <poll.h>
 #include <sys/time.h>
+#include <stdint.h>
 
 class CaptureDevice {
 private:
@@ -28,12 +21,10 @@ private:
     };
     std::vector<Buffer> buffers;
 
-    // These are now private internal steps
     bool openDevice();
     bool requestBuffers(uint32_t count);
     bool mapAndQueueBuffers(uint32_t count);
     bool exportBuffers();
-    bool startStreaming();
 
 public:
     CaptureDevice(const std::string& path, uint32_t w, uint32_t h, uint32_t format);
@@ -43,8 +34,13 @@ public:
     uint32_t getHeight() const { return height; }
 
     bool configureFormat();
-    // Single public method for complete setup
     bool initialize(uint32_t count);
+    
+    // Нові методи для динамічного перезапуску
+    void stopStreaming();
+    void releaseBuffers();
+    bool startStreaming();
+    bool querySignal(uint32_t &w, uint32_t &h);
 
     int dequeueBuffer(uint32_t& bytes_used, struct timeval& timestamp);
     bool queueBuffer(int index);
@@ -53,4 +49,4 @@ public:
     int getFd() const;
 };
 
-#endif // CAPTURE_DEVICE_HPP
+#endif

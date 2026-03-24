@@ -33,29 +33,41 @@ int main() {
     }
 
     CaptureDevice capture(Config::data.video.device, Config::data.video.width, Config::data.video.height, Config::data.video.getV4L2Format());
-    if (!capture.initialize(Config::data.buffers.count)) {
-        std::cerr << "Fatal error: Failed to initialize capture device." << std::endl;
-        return 1;
-    }
+    bool is_initialized = capture.initialize(Config::data.buffers.count);
 
     EncoderDevice encoder(Config::data.encoder.device);
-    if (!encoder.initialize(capture.getWidth(), capture.getHeight(), Config::data.video.fps, Config::data.buffers.count)) {
-        std::cerr << "Fatal error: Failed to initialize encoder device." << std::endl;
-        return 1;
+    if (is_initialized) {
+        encoder.initialize(capture.getWidth(), capture.getHeight(), Config::data.video.fps, Config::data.buffers.count);
     }
 
-    std::cerr << "KVM Engine v2.6 (Auto-Recovery) started." << std::endl;
+    std::cerr << "KVM Engine v2.7 (Smart Recovery) started." << std::endl;
 
     struct pollfd fds[2];
-    fds[0].fd     = capture.getFd();
-    fds[0].events = POLLIN;
-    fds[1].fd     = encoder.getFd();
-    fds[1].events = POLLIN;
-
     int consecutive_timeouts = 0;
 
     try {
         while (keepRunning) {
+            if (!is_initialized) {
+                uint32_t w, h;
+                if (capture.querySignal(w, h)) {
+                    std::cerr << "Signal detected! Initializing hardware..." << std::endl;
+                    if (capture.initialize(Config::data.buffers.count)) {
+                        encoder.initialize(capture.getWidth(), capture.getHeight(), Config::data.video.fps, Config::data.buffers.count);
+                        is_initialized = true;
+                        consecutive_timeouts = 0;
+                    }
+                }
+                if (!is_initialized) {
+                    sleep(2);
+                    continue;
+                }
+            }
+
+            fds[0].fd     = capture.getFd();
+            fds[0].events = POLLIN;
+            fds[1].fd     = encoder.getFd();
+            fds[1].events = POLLIN;
+
             int ret = poll(fds, 2, 1000);
             
             if (ret < 0) {
@@ -65,11 +77,14 @@ int main() {
 
             if (ret == 0) {
                 consecutive_timeouts++;
-                // Every 5 seconds of no signal, try to "kick" the hardware timings
                 if (consecutive_timeouts % 5 == 0) {
-                    std::cerr << "No signal... waiting for host to wake up." << std::endl;
-                    // Trigger a re-query of timings in the driver
-                    capture.configureFormat(); 
+                    uint32_t w, h;
+                    if (!capture.querySignal(w, h)) {
+                        std::cerr << "Signal lost. Entering standby mode..." << std::endl;
+                        capture.stopStreaming();
+                        capture.releaseBuffers();
+                        is_initialized = false;
+                    }
                 }
                 continue;
             }
