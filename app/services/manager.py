@@ -33,7 +33,7 @@ class ServiceManager:
 
         # Paths for binaries
         config_path = self.settings.project_root / "config" / "mediamtx.yml"
-        mediamtx_cmd = ["./mediamtx", "-conf", str(config_path)]
+        mediamtx_cmd = ["./mediamtx", str(config_path)]
         hid_server_cmd = [str(self.settings.project_root / self.settings.hid_server_bin)]
 
         # Note: kvm_engine is currently managed by MediaMTX via 'runOnInit' in mediamtx.yml
