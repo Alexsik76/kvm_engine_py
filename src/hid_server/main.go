@@ -62,7 +62,7 @@ type KeyboardEvent struct {
 type MouseEvent struct {
 	Buttons byte `json:"buttons"`
 	X       int8 `json:"x"`
-	Y       int8 *int8
+	Y       int8 `json:"y"`
 	Wheel   int8 `json:"wheel"`
 }
 
@@ -112,13 +112,14 @@ func (h *HIDManager) SendKeyReport(event KeyboardEvent) error {
 func (h *HIDManager) SendMouseReport(event MouseEvent) error {
 	h.mouseMu.Lock()
 	defer h.mouseMu.Unlock()
-	report := []byte{event.Buttons, byte(event.X), 0, byte(event.Wheel)} // Placeholder for Y
+	report := []byte{event.Buttons, byte(event.X), byte(event.Y), byte(event.Wheel)}
 	_, err := h.mFile.Write(report)
 	return err
 }
 
 func (h *HIDManager) ClearAll() {
 	h.SendKeyReport(KeyboardEvent{Modifiers: 0, Keys: []byte{}})
+	h.SendMouseReport(MouseEvent{Buttons: 0, X: 0, Y: 0, Wheel: 0})
 }
 
 func (h *HIDManager) Close() {
@@ -134,6 +135,7 @@ type WSHandler struct {
 func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(rw, r, nil)
 	if err != nil {
+		log.Printf("WS Upgrade error: %v", err)
 		return
 	}
 	defer func() {
@@ -158,12 +160,16 @@ func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		switch msgType {
 		case "keyboard":
 			var kb KeyboardEvent
-			json.Unmarshal(dataBytes, &kb)
-			if err := w.hid.SendKeyReport(kb); err != nil {
-				conn.WriteJSON(map[string]string{"type": "reset_hid"})
+			if err := json.Unmarshal(dataBytes, &kb); err == nil {
+				if err := w.hid.SendKeyReport(kb); err != nil {
+					conn.WriteJSON(map[string]string{"type": "reset_hid"})
+				}
 			}
 		case "mouse":
-			// Mouse logic...
+			var m MouseEvent
+			if err := json.Unmarshal(dataBytes, &m); err == nil {
+				w.hid.SendMouseReport(m)
+			}
 		}
 	}
 }
@@ -199,8 +205,13 @@ func wakeHandler(hid *HIDManager) http.HandlerFunc {
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	loadConfig("")
-	hid, _ := NewHIDManager()
+	if err := loadConfig(""); err != nil {
+		log.Fatalf("Config failure: %v", err)
+	}
+	hid, err := NewHIDManager()
+	if err != nil {
+		log.Fatalf("HID failure: %v", err)
+	}
 	defer hid.Close()
 
 	http.Handle("/ws/control", &WSHandler{hid: hid})
@@ -208,6 +219,8 @@ func main() {
 	http.HandleFunc("/ws/wake", wakeHandler(hid))
 
 	port := fmt.Sprintf(":%d", config.Server.Port)
-	log.Printf("HID Server v3.1 (Full-Cycle Wake) starting on %s", port)
-	http.ListenAndServe(port, nil)
+	log.Printf("HID Server v3.2 (Fixed) starting on %s", port)
+	if err := http.ListenAndServe(port, nil); err != nil {
+		log.Fatal(err)
+	}
 }
