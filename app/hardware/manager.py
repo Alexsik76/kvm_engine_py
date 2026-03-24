@@ -44,8 +44,10 @@ class HardwareManager:
         config_strings_path = config_path / "strings" / "0x409"
         config_strings_path.mkdir(parents=True, exist_ok=True)
         (config_strings_path / "configuration").write_text("Config 1: HID Gadget")
-        (config_path / "bmAttributes").write_text("0xa0")
-        (config_path / "MaxPower").write_text("250")
+        # bmAttributes: 0xe0 = Self-powered + Remote Wakeup
+        (config_path / "bmAttributes").write_text("0xe0")
+        # MaxPower: 0 = We don't draw any power from the host (Pi has its own PSU)
+        (config_path / "MaxPower").write_text("0")
 
         # 7. Bind Functions
         (config_path / "hid.usb0").symlink_to(self.gadget_path / "functions" / "hid.usb0")
