@@ -176,40 +176,35 @@ func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 func wakeHandler(hid *HIDManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("HTTP Wake request received from %s on path %s", r.RemoteAddr, r.URL.Path)
+		log.Printf("HTTP Wake request received from %s", r.RemoteAddr)
 		
-		// Try to trigger USB SRP via sysfs to re-activate the gadget
-		files, _ := filepath.Glob("/sys/class/udc/*/srp")
-		for _, f := range files {
-			os.WriteFile(f, []byte("1"), 0200)
-		}
-		time.Sleep(200 * time.Millisecond)
+		const udcFile = "/sys/kernel/config/usb_gadget/kvm_gadget/UDC"
+		const udcName = "fe980000.usb"
 
-		kbEvent := KeyboardEvent{Modifiers: 0x02, Keys: []byte{}}
-		var err error
+		// Ефективний метод пробудження для вашої материнської плати:
+		// Віртуальне витягування та вставляння кабелю (Rebind)
 		
-		// Retry writing up to 3 times in case the gadget is still re-initializing
-		for i := 0; i < 3; i++ {
-			err = hid.SendKeyReport(kbEvent)
-			if err == nil {
-				break
-			}
-			log.Printf("Wake attempt %d failed: %v. Retrying...", i+1, err)
-			time.Sleep(500 * time.Millisecond)
-		}
-
+		log.Printf("Executing Magic Wake Sequence (Rebind UDC)...")
+		
+		// 1. Unbind (це будить комп'ютер миттєво)
+		err := os.WriteFile(udcFile, []byte("\n"), 0644)
 		if err != nil {
-			log.Printf("Wake failed after retries: %v", err)
-			http.Error(w, fmt.Sprintf("HID write failed: %v", err), 500)
+			log.Printf("Unbind failed: %v", err)
+		}
+		
+		time.Sleep(1 * time.Second)
+		
+		// 2. Bind назад (щоб керування відразу запрацювало)
+		err = os.WriteFile(udcFile, []byte(udcName), 0644)
+		if err != nil {
+			log.Printf("Bind failed: %v", err)
+			http.Error(w, "UDC Bind failed", 500)
 			return
 		}
-		
-		time.Sleep(100 * time.Millisecond)
-		hid.ClearAll()
-		
+
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ok"}`)
-		log.Printf("Wake signal sent successfully")
+		fmt.Fprintf(w, `{"status":"ok","message":"host woke up by virtual unplug"}`)
+		log.Printf("Wake sequence complete. Host should be active.")
 	}
 }
 
@@ -225,12 +220,11 @@ func main() {
 	defer hid.Close()
 
 	http.Handle("/ws/control", &WSHandler{hid: hid})
-	// Слухаємо обидва варіанти для надійності
 	http.HandleFunc("/wake", wakeHandler(hid))
 	http.HandleFunc("/ws/wake", wakeHandler(hid))
 
 	port := fmt.Sprintf(":%d", config.Server.Port)
-	log.Printf("HID Server v2.1 (WS-compatible) starting on %s", port)
+	log.Printf("HID Server v3.0 (Magic-Wake enabled) starting on %s", port)
 	if err := http.ListenAndServe(port, nil); err != nil {
 		log.Fatal(err)
 	}

@@ -186,33 +186,9 @@ class HardwareManager:
             log.error("hardware_gadget_rebind_failed", error=str(e))
 
     def wake_host(self):
-        """Ported logic from wake_host.sh"""
-        log.info("hardware_wake_host_signal")
-        
-        # Try USB SRP (Session Request Protocol)
-        udc_controllers = os.listdir("/sys/class/udc")
-        if udc_controllers:
-            udc_name = udc_controllers[0]
-            srp_path = Path(f"/sys/class/udc/{udc_name}/srp")
-            if srp_path.exists():
-                try:
-                    srp_path.write_text("1")
-                except OSError:
-                    pass
-
-        # Send Left Shift keypress
-        hid_path = Path("/dev/hidg0")
-        if hid_path.exists():
-            try:
-                # Left Shift press
-                hid_path.write_bytes(bytes([0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))
-                import time
-                time.sleep(0.1)
-                # Release
-                hid_path.write_bytes(bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))
-                log.info("hardware_wake_host_sent")
-            except Exception as e:
-                log.error("hardware_wake_host_failed", error=str(e))
-        else:
-            log.warning("hardware_hid_missing_for_wake", path=str(hid_path))
+        """Magic Wake sequence: Force a virtual unplug/replug of the USB gadget."""
+        log.info("hardware_wake_host_magic_sequence_start")
+        # Reuse the rebind logic which we proved works for this BIOS
+        self.force_rebind_gadget()
+        log.info("hardware_wake_host_magic_sequence_complete")
 
