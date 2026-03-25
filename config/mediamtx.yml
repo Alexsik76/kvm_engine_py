@@ -3,10 +3,8 @@ webrtc: yes
 
 paths:
   kvm:
-    runOnInit: sh -c '/home/alex/kvm_engine_py/kvm_engine | ffmpeg -loglevel quiet -use_wallclock_as_timestamps 1 -f h264 -i pipe:0 -c:v copy -bf 0 -rtsp_transport tcp -pkt_size 1200 -f rtsp rtsp://localhost:$RTSP_PORT/$RTSP_PATH 2>/dev/null'
-    runOnInitRestart: yes
-    fallback: /nosignal
-
-  nosignal:
-    runOnInit: ffmpeg -loglevel quiet -re -f lavfi -i "color=c=blue:s=1280x720:r=5" -vf "drawtext=text='NO SIGNAL':fontcolor=white:fontsize=96:x=(w-text_w)/2:y=(h-text_h)/2" -c:v libx264 -preset ultrafast -tune zerolatency -b:v 100k -f rtsp rtsp://localhost:$RTSP_PORT/$RTSP_PATH
-    runOnInitRestart: yes
+    runOnConnect: sh -c '/home/alex/kvm_engine_py/kvm_engine | ffmpeg -loglevel quiet -use_wallclock_as_timestamps 1 -f h264 -i pipe:0 -c:v copy -bf 0 -rtsp_transport tcp -pkt_size 1200 -f rtsp rtsp://localhost:$RTSP_PORT/$RTSP_PATH 2>/dev/null'
+    runOnConnectRestart: yes
+    alwaysAvailable: true
+    alwaysAvailableTracks:
+      - codec: H264

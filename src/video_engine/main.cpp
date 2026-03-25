@@ -54,7 +54,7 @@ int main() {
 
     try {
         while (keepRunning) {
-            int ret = poll(fds, 2, 500); // 500ms timeout is enough to check status
+            int ret = poll(fds, 2, 1000);
             
             if (ret < 0) {
                 if (errno == EINTR) continue; 
@@ -62,8 +62,11 @@ int main() {
             }
 
             if (ret == 0) {
-                // Poll timeout: No HDMI signal.
-                // Just wait quietly. FFmpeg will handle the "NO SIGNAL" fallback overlay.
+                struct v4l2_dv_timings timings;
+                if (ioctl(capture.getFd(), VIDIOC_QUERY_DV_TIMINGS, &timings) != 0) {
+                    std::cerr << "Signal physically lost. Exiting for fallback..." << std::endl;
+                    return 1; 
+                }
                 continue;
             }
 
