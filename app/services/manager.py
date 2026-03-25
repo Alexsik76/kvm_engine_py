@@ -47,11 +47,9 @@ class ServiceManager:
             tg.create_task(self._run_hid_server(hid_server_cmd))
 
     async def _run_mediamtx(self, cmd):
-        async with self.run_process("mediamtx", cmd, cwd=self.settings.mediamtx_path):
-            while True:
-                await asyncio.sleep(1)
+        async with self.run_process("mediamtx", cmd, cwd=self.settings.mediamtx_path) as proc:
+            await proc.wait()
 
     async def _run_hid_server(self, cmd):
-        async with self.run_process("hid_server", cmd, cwd=self.settings.project_root):
-            while True:
-                await asyncio.sleep(1)
+        async with self.run_process("hid_server", cmd, cwd=self.settings.project_root) as proc:
+            await proc.wait()

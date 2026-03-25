@@ -38,6 +38,8 @@ public:
     // Основний метод ініціалізації
     bool initialize(uint32_t count);
 
+    void fillBufferWithBlack(int index);
+
     int dequeueBuffer(uint32_t& bytes_used, struct timeval& timestamp);
     bool queueBuffer(int index);
 

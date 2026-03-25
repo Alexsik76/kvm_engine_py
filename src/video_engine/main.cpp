@@ -54,7 +54,7 @@ int main() {
 
     try {
         while (keepRunning) {
-            int ret = poll(fds, 2, 1000);
+            int ret = poll(fds, 2, 50); // 50ms timeout creates a ~20 FPS heartbeat
             
             if (ret < 0) {
                 if (errno == EINTR) continue; 
@@ -62,13 +62,18 @@ int main() {
             }
 
             if (ret == 0) {
-                // Poll timeout: check if HDMI signal is still physically connected
-                struct v4l2_dv_timings timings;
-                if (ioctl(capture.getFd(), VIDIOC_QUERY_DV_TIMINGS, &timings) != 0) {
-                    std::cerr << "Signal physically lost. Exiting for MediaMTX restart..." << std::endl;
-                    return 1; 
-                }
-                // Signal is active, just wait for hardware to produce frames
+                // Poll timeout: No HDMI signal.
+                // Generate a continuous black frame heartbeat to keep WebRTC alive perfectly.
+                static int dummy_idx = 0;
+                capture.fillBufferWithBlack(dummy_idx);
+                
+                struct timeval ts = {};
+                gettimeofday(&ts, NULL);
+                uint32_t bytes_used = capture.getWidth() * capture.getHeight() * 2; // 16bpp for UYVY
+                
+                encoder.queueOutputBuffer(dummy_idx, capture.getExportFd(dummy_idx), bytes_used, ts);
+                
+                dummy_idx = (dummy_idx + 1) % Config::data.buffers.count;
                 continue;
             }
 
