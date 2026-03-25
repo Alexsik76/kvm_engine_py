@@ -1,9 +1,12 @@
 api: yes
 webrtc: yes
+webrtcICEUDPServerList: [stun:stun.l.google.com:19302]
+webrtcICEUDP: yes
+webrtcICETCP: yes
 
 paths:
   kvm:
-    runOnInit: sh -c '/home/alex/kvm_engine_py/kvm_engine | ffmpeg -loglevel quiet -use_wallclock_as_timestamps 1 -f h264 -i pipe:0 -c:v copy -bf 0 -rtsp_transport tcp -pkt_size 1200 -f rtsp rtsp://localhost:$RTSP_PORT/$RTSP_PATH 2>/dev/null'
+    runOnInit: sh -c '/home/alex/kvm_engine_py/kvm_engine | ffmpeg -loglevel info -use_wallclock_as_timestamps 1 -f h264 -i pipe:0 -c:v copy -bf 0 -rtsp_transport tcp -pkt_size 1200 -f rtsp rtsp://localhost:8554/kvm'
     runOnInitRestart: yes
     alwaysAvailable: true
     alwaysAvailableTracks:
