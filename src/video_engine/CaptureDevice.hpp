@@ -35,10 +35,7 @@ public:
     uint32_t getWidth() const { return width; }
     uint32_t getHeight() const { return height; }
 
-    // Основний метод ініціалізації
     bool initialize(uint32_t count);
-
-    void fillBufferWithBlack(int index);
 
     int dequeueBuffer(uint32_t& bytes_used, struct timeval& timestamp);
     bool queueBuffer(int index);
