@@ -1,8 +1,17 @@
 api: yes
 webrtc: yes
-webrtcAddress: :8889
-webrtcICEServers2:
-  - url: turn:global.relay.metered.ca:80
+webrtcIceServers2:
+  - url: stun:stun.l.google.com:19302
+  - url: "turn:global.relay.metered.ca:80"
+    username: "764a7c65471d394d680f27c1"
+    password: "72KO6XDmdWvv3D4F"
+  - url: "turn:global.relay.metered.ca:80?transport=tcp"
+    username: "764a7c65471d394d680f27c1"
+    password: "72KO6XDmdWvv3D4F"
+  - url: "turn:global.relay.metered.ca:443"
+    username: "764a7c65471d394d680f27c1"
+    password: "72KO6XDmdWvv3D4F"
+  - url: "turn:global.relay.metered.ca:443?transport=tcp"
     username: "764a7c65471d394d680f27c1"
     password: "72KO6XDmdWvv3D4F"
 paths:
