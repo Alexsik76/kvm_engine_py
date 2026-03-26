@@ -1,9 +1,10 @@
 api: yes
 webrtc: yes
+webrtcAddress: :8889
 webrtcICEServers2:
-  - url: turn:79.143.43.173:3478
-    username: 'my_turn_user'
-    password: 'my_secure_password'
+  - url: turn:global.relay.metered.ca:80
+    username: "764a7c65471d394d680f27c1"
+    password: "72KO6XDmdWvv3D4F"
 paths:
   kvm:
     runOnInit: sh -c '/home/alex/kvm_engine_py/kvm_engine | ffmpeg -loglevel info -use_wallclock_as_timestamps 1 -f h264 -i pipe:0 -c:v copy -bf 0 -rtsp_transport tcp -pkt_size 1200 -f rtsp rtsp://localhost:8554/kvm'
