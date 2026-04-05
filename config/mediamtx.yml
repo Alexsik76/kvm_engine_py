@@ -8,8 +8,17 @@ authInternalUsers:
       - action: publish
         path: kvm
 webrtc: true
-webrtcLocalUDPAddress: :30000
-webrtcAdditionalHosts: ["79.143.43.173"]
+
+# alt config 1
+# webrtcLocalUDPAddress: :30000
+# webrtcAdditionalHosts: ["79.143.43.173"]
+
+# alt config 2
+webrtcLocalUDPAddress: ''
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+  - url: stun:stun1.l.google.com:19302
+
 paths:
   kvm:
     runOnDemand: /home/alex/kvm_engine_py/start_ffmpeg.sh
