@@ -14,7 +14,7 @@ webrtc: true
 # webrtcAdditionalHosts: ["79.143.43.173"]
 
 # alt config 2
-webrtcLocalUDPAddress: ''
+webrtcLocalUDPAddress: :30000
 webrtcICEServers2:
   - url: stun:stun.l.google.com:19302
   - url: stun:stun1.l.google.com:19302
