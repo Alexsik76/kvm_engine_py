@@ -39,3 +39,4 @@ src/hid_server/hid_server
 hid_server
 kvm_engine
 docs/
+GEMINI.md
