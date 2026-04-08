@@ -38,3 +38,4 @@ src/video_engine/bin/
 src/hid_server/hid_server
 hid_server
 kvm_engine
+docs/

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -49,7 +49,18 @@ func loadConfig(path string) error {
 }
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // Дозволяємо запити без Origin (наприклад, локальні скрипти)
+		}
+		originURL, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		// Перевіряємо, чи збігається хост Origin із хостом запиту
+		return originURL.Host == r.Host
+	},
 }
 
 type KeyboardEvent struct {
@@ -86,11 +97,11 @@ func (h *HIDManager) reopen() error {
 		h.mFile.Close()
 	}
 
-	kb, err := os.OpenFile(config.Server.KeyboardDevice, os.O_WRONLY, 0666)
+	kb, err := os.OpenFile(config.Server.KeyboardDevice, os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open keyboard: %v", err)
 	}
-	m, err := os.OpenFile(config.Server.MouseDevice, os.O_WRONLY, 0666)
+	m, err := os.OpenFile(config.Server.MouseDevice, os.O_WRONLY, 0600)
 	if err != nil {
 		kb.Close()
 		return fmt.Errorf("failed to open mouse: %v", err)
@@ -112,11 +123,8 @@ func (h *HIDManager) SendKeyReport(event KeyboardEvent) error {
 	}
 
 	_, err := h.kbFile.Write(report)
-	if err != nil && (strings.Contains(err.Error(), "shutdown") || strings.Contains(err.Error(), "invalid")) {
-		log.Printf("Detected dead HID handle, reopening...")
-		if h.reopen() == nil {
-			_, err = h.kbFile.Write(report)
-		}
+	if err != nil {
+		log.Printf("Keyboard write error: %v", err)
 	}
 	return err
 }
@@ -127,10 +135,8 @@ func (h *HIDManager) SendMouseReport(event MouseEvent) error {
 
 	report := []byte{event.Buttons, byte(event.X), byte(event.Y), byte(event.Wheel)}
 	_, err := h.mFile.Write(report)
-	if err != nil && (strings.Contains(err.Error(), "shutdown") || strings.Contains(err.Error(), "invalid")) {
-		if h.reopen() == nil {
-			_, err = h.mFile.Write(report)
-		}
+	if err != nil {
+		log.Printf("Mouse write error: %v", err)
 	}
 	return err
 }
