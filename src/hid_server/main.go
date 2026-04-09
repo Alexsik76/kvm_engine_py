@@ -53,16 +53,9 @@ func loadConfig(path string) error {
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true // Дозволяємо запити без Origin (наприклад, локальні скрипти)
-		}
-		originURL, err := url.Parse(origin)
-		if err != nil {
-			return false
-		}
-		// Перевіряємо, чи збігається хост Origin із хостом запиту
-		return originURL.Host == r.Host
+		// Дозволяємо підключення з будь-якого Origin, 
+		// оскільки безпека забезпечується перевіркою JWT токена.
+		return true
 	},
 }
 
@@ -239,7 +232,33 @@ func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 func wakeHandler(hid *HIDManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Handle CORS preflight
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		log.Printf("HTTP Wake request received from %s", r.RemoteAddr)
+
+		// Check JWT Token
+		authHeader := r.Header.Get("Authorization")
+		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		token := authHeader[7:]
+		
+		_, err := auth.ValidateAccessToken(token, config.Server.JWTSecret)
+		if err != nil {
+			log.Printf("Wake Auth failed: %v", err)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		const udcFile = "/sys/kernel/config/usb_gadget/kvm_gadget/UDC"
 		const udcName = "fe980000.usb"
 
