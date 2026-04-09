@@ -19,6 +19,7 @@
     "server": {
         "port": 8080,
         "keyboard_device": "/dev/hidg0",
-        "mouse_device": "/dev/hidg1"
+        "mouse_device": "/dev/hidg1",
+        "jwt_secret": "8a5241bc53f35df9406455d208efb806f20599b59fcfa031a2fa6fc8c411ccce"
     }
 }
