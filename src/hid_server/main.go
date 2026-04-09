@@ -17,6 +17,7 @@ import (
 type Config struct {
 	Server struct {
 		Port           uint16 `json:"port"`
+		JWTSecret      string `json:"jwt_secret"`
 		KeyboardDevice string `json:"keyboard_device"`
 		MouseDevice    string `json:"mouse_device"`
 	} `json:"server"`
@@ -169,6 +170,23 @@ type WSHandler struct {
 }
 
 func (w *WSHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	// Extract the token from the query parameter
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(rw, "Unauthorized: Missing token", http.StatusUnauthorized)
+		return
+	}
+
+	// Validate the token using the secret from config
+	userID, err := auth.ValidateAccessToken(token, config.Server.JWTSecret)
+	if err != nil {
+		log.Printf("Auth failed for %s: %v", r.RemoteAddr, err)
+		http.Error(rw, "Unauthorized: Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	log.Printf("User %s connected to HID control from %s", userID, r.RemoteAddr)
+
 	conn, err := upgrader.Upgrade(rw, r, nil)
 	if err != nil {
 		log.Printf("WS Upgrade error: %v", err)
