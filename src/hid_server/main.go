@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"hid_server/auth"
+
 	"github.com/gorilla/websocket"
 )
 
