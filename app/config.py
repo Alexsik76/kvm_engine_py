@@ -1,53 +1,59 @@
 import json
 from pathlib import Path
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel
 import structlog
 
 log = structlog.get_logger()
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
-    
-    # Project Paths
-    project_root: Path = Path(__file__).parent.parent
-    mediamtx_path: Path = Path("/home/alex/mediamtx")
-    
-    # Binary Names/Paths
-    hid_server_bin: str = "hid_server"
+_PROJECT_ROOT = Path(__file__).parent.parent
+_DEFAULT_CONFIG = _PROJECT_ROOT / "config" / "config.json"
+
+
+class Settings(BaseModel):
+    project_root: Path = _PROJECT_ROOT
+
+    # [paths]
+    mediamtx_path: Path = Path("/opt/mediamtx")
+    edid_path: Path = Path("/etc/kvm/force_720p.edid")
     kvm_engine_bin: str = "kvm_engine"
-    
-    # Hardware Configuration
+
+    # [video]
     video_device: str = "/dev/video0"
-    edid_path: Path = Path("/home/alex/TC358743-Driver/force_720p.edid")
-    
-    # HID Server Configuration (loaded from config.json)
+
+    # [hid]
     hid_port: int = 8080
-    jwt_secret: str = "your_default_jwt_secret"
+    jwt_secret: str = ""
     keyboard_device: str = "/dev/hidg0"
     mouse_device: str = "/dev/hidg1"
-    
-    # Logging
+
+    # [logging]
     log_level: str = "INFO"
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._load_json_config()
+    @classmethod
+    def from_file(cls, path: Path = _DEFAULT_CONFIG) -> "Settings":
+        if not path.exists():
+            log.warning("config_file_missing", path=str(path))
+            return cls()
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            log.error("config_file_read_failed", path=str(path), error=str(e))
+            return cls()
 
-    def _load_json_config(self):
-        config_path = self.project_root / "config" / "config.json"
-        if config_path.exists():
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    server_cfg = data.get("server", {})
-                    
-                    if "port" in server_cfg:
-                        self.hid_port = server_cfg["port"]
-                    if "jwt_secret" in server_cfg:
-                        self.jwt_secret = server_cfg["jwt_secret"]
-                    if "keyboard_device" in server_cfg:
-                        self.keyboard_device = server_cfg["keyboard_device"]
-                    if "mouse_device" in server_cfg:
-                        self.mouse_device = server_cfg["mouse_device"]
-            except Exception as e:
-                log.error("failed_to_load_json_config", error=str(e))
+        p = data.get("paths", {})
+        h = data.get("hid", {})
+        v = data.get("video", {})
+        lg = data.get("logging", {})
+
+        return cls(
+            mediamtx_path=Path(p.get("mediamtx", "/opt/mediamtx")),
+            edid_path=Path(p.get("edid", "/etc/kvm/force_720p.edid")),
+            kvm_engine_bin=p.get("kvm_engine_bin", "kvm_engine"),
+            video_device=v.get("device", "/dev/video0"),
+            hid_port=h.get("port", 8080),
+            jwt_secret=h.get("jwt_secret", ""),
+            keyboard_device=h.get("keyboard_device", "/dev/hidg0"),
+            mouse_device=h.get("mouse_device", "/dev/hidg1"),
+            log_level=lg.get("level", "INFO"),
+        )

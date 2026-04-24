@@ -29,7 +29,7 @@ The project is transitioning from a collection of loosely coupled Bash scripts t
 
 ### C. Execution Layer (Workers)
 * **`MediaMTX` (Go)**: High-efficiency video streaming (WebRTC/RTSP).
-* **`HID Server` (Go)**: Handles real-time HID emulation over WebSockets.
+* **`HIDServer` (Python/asyncio)**: Real-time HID emulation over WebSockets — integrated directly into `kvm_engine_py` via `app.hid.server`.
 * **`KVM Engine` (C++)**: Low-latency hardware-accelerated video encoding.
 
 ---
@@ -58,7 +58,7 @@ The project is transitioning from a collection of loosely coupled Bash scripts t
 | **CLI Framework** | `click` |
 | **Validation** | `pydantic`, `pydantic-settings` |
 | **Logging** | `structlog` |
-| **I/O** | `asyncio`, `httpx` (for downloads) |
+| **I/O** | `asyncio`, `aiohttp` (WebSocket), `httpx` (downloads) |
 | **Environment** | `venv` (Isolated Virtual Environment) |
 
 ---

@@ -1,4 +1,15 @@
 {
+    "paths": {
+        "mediamtx": "/opt/mediamtx",
+        "edid": "/etc/kvm/force_720p.edid",
+        "kvm_engine_bin": "kvm_engine"
+    },
+    "hid": {
+        "port": 8080,
+        "jwt_secret": "8a5241bc53f35df9406455d208efb806f20599b59fcfa031a2fa6fc8c411ccce",
+        "keyboard_device": "/dev/hidg0",
+        "mouse_device": "/dev/hidg1"
+    },
     "video": {
         "device": "/dev/video0",
         "width": 1280,
@@ -16,10 +27,7 @@
     "buffers": {
         "count": 3
     },
-    "server": {
-        "port": 8080,
-        "keyboard_device": "/dev/hidg0",
-        "mouse_device": "/dev/hidg1",
-        "jwt_secret": "8a5241bc53f35df9406455d208efb806f20599b59fcfa031a2fa6fc8c411ccce"
+    "logging": {
+        "level": "INFO"
     }
 }

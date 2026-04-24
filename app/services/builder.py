@@ -16,7 +16,7 @@ class ProjectBuilder:
             log.info("dependency_missing", name="nlohmann/json")
             self.include_dir.mkdir(parents=True, exist_ok=True)
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(self.json_url)
                 response.raise_for_status()
                 (self.include_dir / "json.hpp").write_bytes(response.content)

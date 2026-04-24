@@ -28,36 +28,39 @@ def cli():
 @click.option("--no-hw", is_flag=True, help="Skip hardware initialization (e.g. for testing on PC)")
 def run(build: bool, no_hw: bool):
     """Start the KVM engine and all services"""
-    settings = Settings()
+    settings = Settings.from_file()
     log = structlog.get_logger()
-    
-    # 1. Build Layer
-    if build:
-        builder = ProjectBuilder(settings)
-        asyncio.run(builder.ensure_dependencies())
-        try:
-            builder.build_all(force_rebuild=True)
-            log.info("build_complete")
-        except subprocess.CalledProcessError as e:
-            log.error("build_failed", error=str(e))
-            sys.exit(1)
 
-    # 2. Hardware Layer
-    if not no_hw:
-        hw_manager = HardwareManager(settings)
-        try:
-            hw_manager.setup_usb_gadget()
-            asyncio.run(hw_manager.init_v4l2())
-            log.info("hardware_initialized")
-        except Exception as e:
-            log.error("hardware_init_failed", error=str(e))
+    async def _startup():
+        # 1. Build Layer
+        if build:
+            builder = ProjectBuilder(settings)
+            await builder.ensure_dependencies()
+            try:
+                builder.build_all(force_rebuild=True)
+                log.info("build_complete")
+            except subprocess.CalledProcessError as e:
+                log.error("build_failed", error=str(e))
+                sys.exit(1)
 
-    # 3. Service Layer
-    manager = ServiceManager(settings)
-    log.info("kvm_orchestrator_started")
+        # 2. Hardware Layer
+        if not no_hw:
+            hw_manager = HardwareManager(settings)
+            try:
+                hw_manager.setup_usb_gadget()
+                await hw_manager.init_v4l2()
+                log.info("hardware_initialized")
+            except Exception as e:
+                log.error("hardware_init_failed", error=str(e))
+                sys.exit(1)
+
+        # 3. Service Layer
+        manager = ServiceManager(settings)
+        log.info("kvm_orchestrator_started")
+        await manager.start_all()
 
     try:
-        asyncio.run(manager.start_all())
+        asyncio.run(_startup())
     except KeyboardInterrupt:
         log.info("shutdown_by_user")
     except Exception as e:
@@ -67,9 +70,8 @@ def run(build: bool, no_hw: bool):
 @cli.command()
 def wake():
     """Send a wakeup signal to the host OS"""
-    settings = Settings()
+    settings = Settings.from_file()
     hw_manager = HardwareManager(settings)
-    # Force re-bind gadget to recover from 'endpoint shutdown'
     hw_manager.force_rebind_gadget()
     hw_manager.wake_host()
 

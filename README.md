@@ -8,11 +8,11 @@ The system follows an **Event-Driven Orchestrator** pattern, where Python acts a
 
 - **Hardware Layer (`app/hardware/`)**: Native Python implementation for Linux ConfigFS (USB Gadget) and V4L2 (Video Bridge) initialization. Replaces legacy Shell scripts.
 - **Service Layer (`app/services/`)**: 
-    - `ProjectBuilder`: Automated C++ (GCC) and Go compiler orchestration.
+    - `ProjectBuilder`: Automated C++ (GCC) compiler orchestration.
     - `ServiceManager`: Asyncio-based lifecycle management for background processes.
+- **HID Layer (`app/hid/`, `app/ws/`)**: Python/asyncio WebSocket server for real-time keyboard and mouse emulation — replaces the former Go `hid_server` binary.
 - **Execution Layer (`src/`)**:
     - `video_engine` (C++): Hardware-accelerated H.264 encoding via V4L2.
-    - `hid_server` (Go): Real-time HID emulation over WebSockets.
     - `MediaMTX`: High-efficiency WebRTC/RTSP streaming server.
 
 ## Component Interaction
@@ -26,7 +26,7 @@ The system follows an **Event-Driven Orchestrator** pattern, where Python acts a
 
 ### Prerequisites
 - Raspberry Pi 4 with TC358743 Video Bridge.
-- Go, G++, and Python 3.10+ installed.
+- G++ and Python 3.10+ installed.
 
 ### Execution
 Run the orchestrator (use `sudo` for hardware access):

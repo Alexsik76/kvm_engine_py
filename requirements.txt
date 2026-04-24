@@ -1,7 +1,6 @@
 click>=8.0.0
-pydantic-settings
-structlog
-httpx
-pydantic[email]
+pydantic>=2.6.0
+structlog>=24.1.0
+httpx>=0.27.0
 aiohttp>=3.9.0
 PyJWT>=2.8.0

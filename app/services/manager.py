@@ -1,6 +1,5 @@
 import asyncio
 import structlog
-from pathlib import Path
 from contextlib import asynccontextmanager
 from app.hid.server import HIDServer
 
@@ -12,37 +11,33 @@ class ServiceManager:
         self.hid_server = HIDServer(settings)
 
     @asynccontextmanager
-    async def run_process(self, name: str, command: list, cwd: str = None):
+    async def run_process(self, name: str, command: list, cwd: str | None = None):
         log.info("service_starting", name=name, command=" ".join(command))
-
         proc = await asyncio.create_subprocess_exec(
             *command,
-            cwd=str(cwd) if cwd else None
+            cwd=str(cwd) if cwd else None,
         )
-
         try:
             yield proc
         finally:
             log.info("service_stopping", name=name)
             if proc.returncode is None:
                 proc.terminate()
-                await proc.wait()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    log.warning("service_force_kill", name=name)
+                    proc.kill()
+                    await proc.wait()
 
     async def start_all(self):
-        """Orchestrate primary services: MediaMTX and HID Server"""
-
-        # Paths for binaries
+        """Orchestrates primary services: MediaMTX and internal HID Server."""
         config_path = self.settings.project_root / "config" / "mediamtx.yml"
         mediamtx_cmd = ["./mediamtx", str(config_path)]
 
-        # Note: kvm_engine is currently managed by MediaMTX via 'runOnInit' in mediamtx.yml
-        # to simplify the ffmpeg piping. 
-
+        # kvm_engine is launched by MediaMTX via runOnDemand in mediamtx.yml
         async with asyncio.TaskGroup() as tg:
-            # 1. Start MediaMTX (handles video pipeline)
             tg.create_task(self._run_mediamtx(mediamtx_cmd))
-
-            # 2. Start Python-based HID Server (handles keyboard/mouse)
             tg.create_task(self._run_internal_hid_server())
 
     async def _run_mediamtx(self, cmd):
@@ -53,9 +48,7 @@ class ServiceManager:
         log.info("starting_internal_hid_server")
         try:
             await self.hid_server.start()
-            # Keep the task alive as long as the server is running
-            while True:
-                await asyncio.sleep(3600)
+            await self.hid_server.wait_closed()
         except asyncio.CancelledError:
             await self.hid_server.stop()
             raise
