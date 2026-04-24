@@ -1,5 +1,6 @@
 import asyncio
 import json
+import base64
 import structlog
 import aiohttp
 from aiohttp import web
@@ -56,9 +57,19 @@ class HIDServer:
                             continue
 
                         if msg_type == "keyboard":
+                            raw_keys = payload.get("keys", [])
+                            if isinstance(raw_keys, str):
+                                try:
+                                    keys_list = list(base64.b64decode(raw_keys))
+                                except Exception:
+                                    log.warning("failed_to_decode_base64_keys")
+                                    keys_list = []
+                            else:
+                                keys_list = raw_keys
+
                             await self.hid.send_key_report(
                                 modifiers=payload.get("modifiers", 0),
-                                keys=payload.get("keys", [])
+                                keys=keys_list
                             )
                         elif msg_type == "mouse":
                             await self.hid.send_mouse_report(
@@ -79,4 +90,5 @@ class HIDServer:
             await self.hid.clear_all()
         
         return ws
+
 
