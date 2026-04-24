@@ -16,5 +16,11 @@ class Settings(BaseSettings):
     video_device: str = "/dev/video0"
     edid_path: Path = Path("/home/alex/TC358743-Driver/force_720p.edid")
     
+    # HID Server Configuration
+    hid_port: int = 8080
+    jwt_secret: str = "your_default_jwt_secret"
+    keyboard_device: str = "/dev/hidg0"
+    mouse_device: str = "/dev/hidg1"
+    
     # Logging
     log_level: str = "INFO"

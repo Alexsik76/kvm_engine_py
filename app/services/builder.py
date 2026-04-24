@@ -23,14 +23,13 @@ class ProjectBuilder:
 
     def build_all(self, force_rebuild: bool = False):
         engine_bin = self.settings.project_root / self.settings.kvm_engine_bin
-        hid_bin = self.settings.project_root / self.settings.hid_server_bin
 
         # Check if binaries already exist to skip redundant steps, unless forced
-        if not force_rebuild and engine_bin.exists() and hid_bin.exists():
+        if not force_rebuild and engine_bin.exists():
             log.info("binaries_exist", action="skipping_build")
             return
 
-        log.info("build_starting", engine=str(engine_bin), hid=str(hid_bin))
+        log.info("build_starting", engine=str(engine_bin))
 
         # Build C++ Video Engine (Core)
         cpp_source_dir = self.settings.project_root / "src" / "video_engine"
@@ -45,7 +44,3 @@ class ProjectBuilder:
             "-o", str(engine_bin)
         ]
         subprocess.run(cpp_cmd, cwd=self.settings.project_root, check=True)
-
-        # Build Go HID Server
-        go_cmd = ["go", "build", "-o", str(hid_bin), "main.go"]
-        subprocess.run(go_cmd, cwd=self.settings.project_root / "src" / "hid_server", check=True)

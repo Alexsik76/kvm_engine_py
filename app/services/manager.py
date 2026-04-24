@@ -2,19 +2,19 @@ import asyncio
 import structlog
 from pathlib import Path
 from contextlib import asynccontextmanager
+from app.hid.server import HIDServer
 
 log = structlog.get_logger()
 
 class ServiceManager:
     def __init__(self, settings):
         self.settings = settings
+        self.hid_server = HIDServer(settings)
 
     @asynccontextmanager
     async def run_process(self, name: str, command: list, cwd: str = None):
         log.info("service_starting", name=name, command=" ".join(command))
 
-        # Note: Some processes (like hid_server) might require sudo to access /dev/hidg*
-        # If running as systemd service, ensure User=root or proper group permissions.
         proc = await asyncio.create_subprocess_exec(
             *command,
             cwd=str(cwd) if cwd else None
@@ -34,7 +34,6 @@ class ServiceManager:
         # Paths for binaries
         config_path = self.settings.project_root / "config" / "mediamtx.yml"
         mediamtx_cmd = ["./mediamtx", str(config_path)]
-        hid_server_cmd = [str(self.settings.project_root / self.settings.hid_server_bin)]
 
         # Note: kvm_engine is currently managed by MediaMTX via 'runOnInit' in mediamtx.yml
         # to simplify the ffmpeg piping. 
@@ -43,13 +42,23 @@ class ServiceManager:
             # 1. Start MediaMTX (handles video pipeline)
             tg.create_task(self._run_mediamtx(mediamtx_cmd))
 
-            # 2. Start HID Server (handles keyboard/mouse)
-            tg.create_task(self._run_hid_server(hid_server_cmd))
+            # 2. Start Python-based HID Server (handles keyboard/mouse)
+            tg.create_task(self._run_internal_hid_server())
 
     async def _run_mediamtx(self, cmd):
         async with self.run_process("mediamtx", cmd, cwd=self.settings.mediamtx_path) as proc:
             await proc.wait()
 
-    async def _run_hid_server(self, cmd):
-        async with self.run_process("hid_server", cmd, cwd=self.settings.project_root) as proc:
-            await proc.wait()
+    async def _run_internal_hid_server(self):
+        log.info("starting_internal_hid_server")
+        try:
+            await self.hid_server.start()
+            # Keep the task alive as long as the server is running
+            while True:
+                await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            await self.hid_server.stop()
+            raise
+        except Exception as e:
+            log.error("internal_hid_server_failed", error=str(e))
+            await self.hid_server.stop()

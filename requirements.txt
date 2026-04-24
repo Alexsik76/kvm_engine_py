@@ -3,3 +3,5 @@ pydantic-settings
 structlog
 httpx
 pydantic[email]
+aiohttp>=3.9.0
+PyJWT>=2.8.0
