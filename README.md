@@ -10,7 +10,7 @@ The system follows an **Event-Driven Orchestrator** pattern, where Python acts a
 - **Service Layer (`app/services/`)**: 
     - `ProjectBuilder`: Automated C++ (GCC) compiler orchestration.
     - `ServiceManager`: Asyncio-based lifecycle management for background processes.
-- **WebSocket Layer (`app/ws/`)**: Single shared `WSServer` (aiohttp) listening on one port. All WebSocket routes (`/ws/control`, `/ws/front_panel`) are registered on it at startup. JWT-authenticated.
+- **WebSocket Layer (`app/ws/`)**: Single shared `WSServer` (aiohttp) listening on one port. All WebSocket routes (`/ws/control`, `/ws/front_panel`) and HTTP routes (`POST /ws/wake`) are registered on it at startup. JWT-authenticated.
 - **HID Layer (`app/hid/`)**: Keyboard and mouse emulation over HID gadget. Registers `/ws/control` on the shared `WSServer`; does not own the server lifecycle.
 - **Execution Layer (`src/`)**:
     - `video_engine` (C++): Hardware-accelerated H.264 encoding via V4L2.
@@ -38,9 +38,39 @@ python -m app.main run --build
 # Start without rebuilding
 python -m app.main run
 
-# Send USB wakeup signal to host
+# Start without hardware (development mode, no /ws/wake route)
+python -m app.main run --no-hw
+
+# Send USB wakeup signal to host (CLI, no server required)
 python -m app.main wake
 ```
+
+## Wake Endpoint
+
+`POST /ws/wake` — HTTP endpoint (not WebSocket) that sends a USB wakeup signal to the target PC. The path prefix `/ws/` is kept for backward compatibility with Go-era clients.
+
+**Request:**
+```
+POST /ws/wake
+Authorization: Bearer <JWT>
+```
+Or via query parameter (for compatibility with `/ws/control`):
+```
+POST /ws/wake?token=<JWT>
+```
+
+**Responses:**
+
+| Status | Body | Condition |
+|---|---|---|
+| `200` | `{"status":"ok"}` | Wake signal sent successfully |
+| `401` | `Unauthorized: Missing token` | No token provided |
+| `401` | `Unauthorized: Invalid token` | Token invalid or expired |
+| `500` | `{"status":"error","message":"wake operation failed"}` | Hardware error |
+
+**Behavior:** Performs a USB gadget rebind (`force_rebind_gadget`) followed by the wake sequence (`wake_host`). Both operations run in a thread executor to avoid blocking the event loop.
+
+**Availability:** The route is registered only when hardware is available (i.e. not running with `--no-hw`).
 
 ## Front-Panel Module (Optional)
 
