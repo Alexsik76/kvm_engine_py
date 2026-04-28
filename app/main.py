@@ -45,6 +45,7 @@ def run(build: bool, no_hw: bool):
                 sys.exit(1)
 
         # 2. Hardware Layer
+        hw_manager = None
         if not no_hw:
             hw_manager = HardwareManager(settings)
             try:
@@ -56,7 +57,7 @@ def run(build: bool, no_hw: bool):
                 sys.exit(1)
 
         # 3. Service Layer
-        manager = ServiceManager(settings)
+        manager = ServiceManager(settings, hw_manager=hw_manager)
         log.info("kvm_orchestrator_started")
         await manager.start_all()
 

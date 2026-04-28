@@ -12,7 +12,7 @@ log = structlog.get_logger()
 
 
 class ServiceManager:
-    def __init__(self, settings):
+    def __init__(self, settings, hw_manager=None):
         self.settings = settings
         self.ws_server = WSServer(port=settings.hid_port)
         self.front_panel = FrontPanelController(settings)
@@ -26,6 +26,14 @@ class ServiceManager:
                 jwt_secret=settings.jwt_secret,
             ),
         )
+
+        if hw_manager is not None:
+            from app.hardware.wake_handler import make_wake_handler
+            self.ws_server.add_route(
+                "POST",
+                "/ws/wake",
+                make_wake_handler(hw_manager, settings.jwt_secret),
+            )
 
     @asynccontextmanager
     async def run_process(self, name: str, command: list, cwd: str | None = None):
