@@ -1,0 +1,23 @@
+api: true
+webrtc: true
+webrtcAllowOrigin: '*'
+webrtcAdditionalHosts: ["79.143.43.173","10.10.1.100"]
+webrtcLocalUDPAddress: 10.10.1.100:8189
+webrtcIceServers2:
+  - url: stun:stun.l.google.com:19302
+  # - url: "turn:global.relay.metered.ca:80"
+  #   username: "764a7c65471d394d680f27c1"
+  #   password: "72KO6XDmdWvv3D4F"
+  # - url: "turn:global.relay.metered.ca:443"
+  #   username: "764a7c65471d394d680f27c1"
+  #   password: "72KO6XDmdWvv3D4F"
+  # - url: "turn:global.relay.metered.ca:443?transport=tcp"
+  #   username: "764a7c65471d394d680f27c1"
+  #   password: "72KO6XDmdWvv3D4F"
+paths:
+  kvm:
+    runOnInit: sh -c '/home/alex/kvm_engine_py/kvm_engine | ffmpeg -loglevel info -use_wallclock_as_timestamps 1 -f h264 -i pipe:0 -c:v copy -bf 0 -rtsp_transport tcp -pkt_size 1200 -f rtsp rtsp://localhost:8554/kvm'
+    runOnInitRestart: true
+    alwaysAvailable: true
+    alwaysAvailableTracks:
+      - codec: H264

@@ -1,7 +1,7 @@
 {
     "paths": {
-        "mediamtx": "/opt/mediamtx",
-        "edid": "/etc/kvm/force_720p.edid",
+        "mediamtx": "/home/alex/mediamtx",
+        "edid": "/home/alex/TC358743-Driver/force_720p.edid",
         "kvm_engine_bin": "kvm_engine"
     },
     "hid": {

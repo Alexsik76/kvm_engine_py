@@ -3,6 +3,7 @@ import click
 import structlog
 import sys
 import subprocess
+import traceback
 from app.config import Settings
 from app.services.manager import ServiceManager
 from app.services.builder import ProjectBuilder
@@ -64,7 +65,7 @@ def run(build: bool, no_hw: bool):
     except KeyboardInterrupt:
         log.info("shutdown_by_user")
     except Exception as e:
-        log.error("fatal_error", error=str(e))
+        log.error("fatal_error", error=str(e), traceback=traceback.format_exc())
         sys.exit(1)
 
 @cli.command()
