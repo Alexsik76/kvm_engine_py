@@ -12,22 +12,17 @@ from app.config import Settings
 log = structlog.get_logger()
 
 class HIDServer:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, ws_server: WSServer):
         self.settings = settings
         self.hid = HIDManager(settings.keyboard_device, settings.mouse_device)
-        self.ws_server = WSServer(port=settings.hid_port)
+        self.ws_server = ws_server
         self.ws_server.add_route("GET", "/ws/control", self.ws_handler)
 
     async def start(self):
         await self.hid.init()
-        await self.ws_server.start()
 
     async def stop(self):
-        await self.ws_server.stop()
         await self.hid.close()
-
-    async def wait_closed(self):
-        await self.ws_server.wait_closed()
 
     async def ws_handler(self, request: web.Request) -> web.StreamResponse:
         token = request.query.get("token")

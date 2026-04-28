@@ -10,7 +10,8 @@ The system follows an **Event-Driven Orchestrator** pattern, where Python acts a
 - **Service Layer (`app/services/`)**: 
     - `ProjectBuilder`: Automated C++ (GCC) compiler orchestration.
     - `ServiceManager`: Asyncio-based lifecycle management for background processes.
-- **HID Layer (`app/hid/`, `app/ws/`)**: Python/asyncio WebSocket server for real-time keyboard and mouse emulation — replaces the former Go `hid_server` binary.
+- **WebSocket Layer (`app/ws/`)**: Single shared `WSServer` (aiohttp) listening on one port. All WebSocket routes (`/ws/control`, `/ws/front_panel`) are registered on it at startup. JWT-authenticated.
+- **HID Layer (`app/hid/`)**: Keyboard and mouse emulation over HID gadget. Registers `/ws/control` on the shared `WSServer`; does not own the server lifecycle.
 - **Execution Layer (`src/`)**:
     - `video_engine` (C++): Hardware-accelerated H.264 encoding via V4L2.
     - `MediaMTX`: High-efficiency WebRTC/RTSP streaming server.
@@ -19,7 +20,7 @@ The system follows an **Event-Driven Orchestrator** pattern, where Python acts a
 
 1. **Initialization**: Validates `.env` settings via Pydantic and configures Hardware (USB HID Gadgets & Video Bridge).
 2. **Build**: Compiles C++ and Go binaries if requested.
-3. **Runtime**: Orchestrates `hid_server` and `mediamtx` as asynchronous subprocesses. `MediaMTX` triggers the `video_engine` pipeline via internal configuration.
+3. **Runtime**: Orchestrates `mediamtx`, the shared `WSServer`, HID logic, and the optional front-panel UART bridge as concurrent asyncio tasks inside a single `TaskGroup`. `MediaMTX` triggers the `video_engine` pipeline via internal configuration.
 4. **Shutdown**: Graceful termination of all subprocesses and resource cleanup via Context Managers.
 
 ## Usage
@@ -62,6 +63,27 @@ An optional hardware add-on based on the RP2040-Zero microcontroller provides re
 | `front_panel_baudrate` | `115200` | Baud rate |
 
 On Windows / development machines without UART hardware, the probe fails gracefully — set `front_panel_enabled: false` in your config or run with the default (probe will time out and disable itself automatically).
+
+**WebSocket API** (same port as HID, default `8080`):
+
+```
+ws://<host>:<hid_port>/ws/front_panel?token=<JWT>
+```
+
+Server → client frames:
+
+| Frame | Description |
+|---|---|
+| `{"type":"led_status","pwr":"on","hdd":"idle"}` | LED state, ~10 Hz |
+| `{"type":"ack","cmd":"power_press"}` | Command confirmed |
+| `{"type":"error","reason":"not_connected"}` | Board unavailable |
+| `{"type":"error","reason":"malformed_json"}` | Bad JSON from client |
+| `{"type":"error","reason":"unknown_command","received":"..."}` | Unknown command |
+| `{"type":"error","reason":"internal"}` | Unexpected server error |
+
+Client → server frames: `{"type":"power_press"}`, `{"type":"power_hold"}`, `{"type":"reset"}`.
+
+A slow client (send blocked > 1 s) is disconnected. Invalid or missing JWT → HTTP 401 before WebSocket upgrade.
 
 Protocol details: `firmware/docs/uart_protocol.md`.
 
