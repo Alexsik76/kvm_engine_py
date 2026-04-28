@@ -198,6 +198,8 @@ class FrontPanelController:
                         reason=frame.get("reason"),
                         received=frame.get("received"),
                     )
+                elif frame.get("type") == "pong":
+                    log.debug("front_panel_late_pong", frame=frame)
                 else:
                     log.warning("front_panel_unexpected_frame", frame=frame)
         except asyncio.CancelledError:
