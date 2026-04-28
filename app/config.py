@@ -29,6 +29,11 @@ class Settings(BaseModel):
     # [logging]
     log_level: str = "INFO"
 
+    # [front_panel]
+    front_panel_enabled: bool = True
+    front_panel_port: str = "/dev/ttyAMA0"
+    front_panel_baudrate: int = 115200
+
     @classmethod
     def from_file(cls, path: Path = _DEFAULT_CONFIG) -> "Settings":
         if not path.exists():
