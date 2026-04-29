@@ -218,4 +218,19 @@ class HardwareManager:
     def wake_host(self):
         log.info("hardware_wake_host_magic_sequence_start")
         self.force_rebind_gadget()
+        time.sleep(3.0) 
+        
+        try:
+            with open('/dev/hidg0', 'wb') as f:
+                f.write(b'\x02\x00\x00\x00\x00\x00\x00\x00')
+                f.flush()
+                
+                time.sleep(0.1)
+                
+                f.write(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+                f.flush()
+                
+            log.info("hardware_wake_keystroke_sent")
+        except Exception as e:
+            log.error("hardware_wake_keystroke_failed", error=str(e))
         log.info("hardware_wake_host_magic_sequence_complete")
