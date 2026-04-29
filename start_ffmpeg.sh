@@ -1,13 +1,15 @@
 #!/bin/bash
 
-# Start the KVM engine and pipe raw H264 to FFmpeg
+# Start the KVM engine and pipe raw H264 to FFmpeg.
+# kvm_engine produces 60fps H264. Match input rate exactly (-r 60) and 
+# regenerate PTS/DTS at the same 60fps base. Lower jitter, no slow-motion.
 /home/alex/kvm_engine_py/kvm_engine | ffmpeg \
     -loglevel warning \
     -f h264 \
-    -r 25 \
+    -r 60 \
     -i pipe:0 \
     -c:v copy \
-    -bsf:v "setts=pts=N/25/TB:dts=N/25/TB" \
+    -bsf:v "setts=pts=N/60/TB:dts=N/60/TB" \
     -rtsp_transport tcp \
     -f rtsp \
     rtsp://admin:password@localhost:8554/kvm
