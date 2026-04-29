@@ -6,6 +6,7 @@ from functools import partial
 from app.ws.server import WSServer
 from app.hid.server import HIDServer
 from app.hardware.front_panel import FrontPanelController
+from app.hardware.video_monitor import VideoSignalMonitor
 from app.hardware.front_panel_ws import front_panel_ws_handler
 
 log = structlog.get_logger()
@@ -15,7 +16,10 @@ class ServiceManager:
     def __init__(self, settings, hw_manager=None):
         self.settings = settings
         self.ws_server = WSServer(port=settings.hid_port)
-        self.front_panel = FrontPanelController(settings)
+        self.video_monitor = VideoSignalMonitor(
+            device_path=settings.video_device.replace("video", "v4l-subdev")
+        )
+        self.front_panel = FrontPanelController(settings, video_monitor=self.video_monitor)
         self.hid_server = HIDServer(settings, ws_server=self.ws_server)
         self.ws_server.add_route(
             "GET",
@@ -65,6 +69,7 @@ class ServiceManager:
             tg.create_task(self._run_ws_server())
             tg.create_task(self._run_hid_server())
             tg.create_task(self._run_front_panel())
+            tg.create_task(self._run_video_monitor())
 
     async def _run_mediamtx(self, cmd):
         async with self.run_process("mediamtx", cmd, cwd=self.settings.mediamtx_path) as proc:
@@ -105,3 +110,15 @@ class ServiceManager:
         except Exception as e:
             log.error("front_panel_failed", error=str(e))
             await self.front_panel.stop()
+
+    async def _run_video_monitor(self):
+        log.info("starting_video_monitor")
+        try:
+            await self.video_monitor.start()
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            await self.video_monitor.stop()
+            raise
+        except Exception as e:
+            log.error("video_monitor_failed", error=str(e))
+            await self.video_monitor.stop()

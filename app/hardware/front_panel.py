@@ -4,6 +4,8 @@ import structlog
 import serial_asyncio
 from serial import SerialException
 
+from app.hardware.video_monitor import VideoSignalMonitor
+
 log = structlog.get_logger()
 
 EXPECTED_PROTOCOL = 1
@@ -104,8 +106,9 @@ class FrontPanelClient:
 
 
 class FrontPanelController:
-    def __init__(self, settings):
+    def __init__(self, settings, video_monitor: VideoSignalMonitor | None = None):
         self._settings = settings
+        self._video_monitor = video_monitor
         self._client = FrontPanelClient(
             port=settings.front_panel_port,
             baudrate=settings.front_panel_baudrate,
@@ -114,26 +117,38 @@ class FrontPanelController:
         self._last_status: dict | None = None
         self._subscribers: list[asyncio.Queue] = []
         self._read_task: asyncio.Task | None = None
+        self._video_relay_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         if not self._settings.front_panel_enabled:
             log.info("front_panel_disabled_in_config")
             return
+        
+        tasks = []
         if await self._client.connect():
             self._is_connected = True
             self._read_task = asyncio.create_task(self._read_loop())
-            log.info("front_panel_started")
+            tasks.append("serial")
+            
+        if self._video_monitor:
+            self._video_relay_task = asyncio.create_task(self._video_relay_loop())
+            tasks.append("video_monitor")
+            
+        if tasks:
+            log.info("front_panel_started", active_components=tasks)
         else:
             log.warning("front_panel_not_detected", attempts=len(PROBE_DELAYS_S))
 
     async def stop(self) -> None:
-        if self._read_task is not None and not self._read_task.done():
-            self._read_task.cancel()
-            try:
-                await self._read_task
-            except asyncio.CancelledError:
-                pass
-            self._read_task = None
+        for task_attr in ["_read_task", "_video_relay_task"]:
+            task = getattr(self, task_attr)
+            if task is not None and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                setattr(self, task_attr, None)
         await self._client.close()
 
     @property
@@ -160,6 +175,9 @@ class FrontPanelController:
         """Returns a copy of the last received led_status frame. None until the first frame arrives."""
         return dict(self._last_status) if self._last_status is not None else None
 
+    def get_video_status(self) -> str:
+        return self._video_monitor.current_status if self._video_monitor else "unknown"
+
     def subscribe(self) -> asyncio.Queue:
         """Registers a new queue for led_status fan-out. Returns the created queue."""
         q: asyncio.Queue = asyncio.Queue(maxsize=SUBSCRIBER_QUEUE_SIZE)
@@ -173,6 +191,13 @@ class FrontPanelController:
         except ValueError:
             pass
 
+    def _broadcast(self, frame: dict):
+        for q in list(self._subscribers):
+            try:
+                q.put_nowait(dict(frame))
+            except asyncio.QueueFull:
+                log.warning("front_panel_subscriber_queue_full")
+
     async def _read_loop(self) -> None:
         try:
             while True:
@@ -185,11 +210,7 @@ class FrontPanelController:
                         "pwr": frame.get("pwr", "unknown"),
                         "hdd": frame.get("hdd", "unknown"),
                     }
-                    for q in list(self._subscribers):
-                        try:
-                            q.put_nowait(dict(self._last_status))
-                        except asyncio.QueueFull:
-                            log.warning("front_panel_subscriber_queue_full")
+                    self._broadcast({"type": "led_status", **self._last_status})
                 elif frame_type == "ack":
                     log.debug("front_panel_ack", cmd=frame.get("cmd"))
                 elif frame_type == "error":
@@ -207,3 +228,17 @@ class FrontPanelController:
         except Exception as e:
             log.error("front_panel_serial_error", error=str(e))
             self._is_connected = False
+
+    async def _video_relay_loop(self) -> None:
+        if not self._video_monitor:
+            return
+        queue = self._video_monitor.subscribe()
+        try:
+            while True:
+                status_frame = await queue.get()
+                self._broadcast(status_frame)
+        except asyncio.CancelledError:
+            raise
+        finally:
+            self._video_monitor.unsubscribe(queue)
+

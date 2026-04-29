@@ -28,13 +28,18 @@ async def front_panel_ws_handler(
     ws = web.WebSocketResponse(heartbeat=30)
     await ws.prepare(request)
 
-    if not controller.is_connected:
-        log.warning("front_panel_ws_unavailable", ip=request.remote)
-        await ws.send_json({"type": "error", "reason": "not_connected"})
-        await ws.close()
-        return ws
-
     log.info("front_panel_ws_connected", user_id=user_id, ip=request.remote)
+    
+    # Send initial status
+    initial_led = controller.get_status()
+    if initial_led:
+        await ws.send_json({"type": "led_status", **initial_led})
+    
+    await ws.send_json({
+        "type": "video_status", 
+        "status": controller.get_video_status()
+    })
+
     queue = controller.subscribe()
 
     reader_task: asyncio.Task | None = None
