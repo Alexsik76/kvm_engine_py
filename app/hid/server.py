@@ -71,6 +71,13 @@ class HIDServer:
                                 y=payload.get("y", 0),
                                 wheel=payload.get("wheel", 0),
                             )
+                        elif msg_type == "ping":
+                            ping_id = payload.get("id")
+                            try:
+                                await ws.send_json({"type": "pong", "data": {"id": ping_id}})
+                            except Exception:
+                                # ws може бути на стадії закриття — мовчки ігноруємо
+                                pass
                         else:
                             log.warning("unknown_msg_type", msg_type=msg_type)
 
