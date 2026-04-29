@@ -5,13 +5,27 @@ from typing import Callable, Awaitable, Sequence
 
 log = structlog.get_logger()
 
+@web.middleware
+async def cors_middleware(request, handler):
+    """Middleware для обробки CORS та OPTIONS (preflight) запитів."""
+    if request.method == "OPTIONS":
+        response = web.Response(status=200)
+    else:
+        response = await handler(request)
+
+    response.headers['Access-Control-Allow-Origin'] = 'https://kvm.lab.vn.ua' 
+    response.headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+    
+    return response
+
 class WSServer:
     """Independent, reusable HTTP/WebSocket server backed by aiohttp."""
 
     def __init__(self, host: str = "0.0.0.0", port: int = 8080):
         self.host = host
         self.port = port
-        self.app = web.Application()
+        self.app = web.Application(middlewares=[cors_middleware])
         self.runner: web.AppRunner | None = None
         self.site: web.TCPSite | None = None
         self._stop_event: asyncio.Event | None = None
