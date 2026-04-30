@@ -1,7 +1,7 @@
 {
     "paths": {
         "mediamtx": "/home/alex/mediamtx",
-        "edid": "/home/alex/TC358743-Driver/force_720p.edid",
+        "edid": "/home/alex/TC358743-Driver/720p60edid",
         "kvm_engine_bin": "kvm_engine"
     },
     "hid": {
@@ -25,7 +25,7 @@
         "level": "4.0"
     },
     "buffers": {
-        "count": 3
+        "count": 6
     },
     "logging": {
         "level": "INFO"

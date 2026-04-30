@@ -124,7 +124,7 @@ int main() {
 #ifdef DEBUG_TIMING
             auto t0 = clk::now();
 #endif
-            int ret = poll(fds, 2, 1000);
+            int ret = poll(fds, 2, 5);
 #ifdef DEBUG_TIMING
             ts.poll_ms.push_back(ms_since(t0));
 #endif

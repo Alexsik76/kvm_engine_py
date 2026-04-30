@@ -5,11 +5,10 @@
 # regenerate PTS/DTS at the same 60fps base. Lower jitter, no slow-motion.
 /home/alex/kvm_engine_py/kvm_engine | ffmpeg \
     -loglevel warning \
+    -use_wallclock_as_timestamps 1 \
     -f h264 \
-    -r 60 \
     -i pipe:0 \
     -c:v copy \
-    -bsf:v "setts=pts=N/60/TB:dts=N/60/TB" \
     -rtsp_transport tcp \
     -f rtsp \
     rtsp://admin:password@localhost:8554/kvm
