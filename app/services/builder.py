@@ -1,4 +1,5 @@
 import subprocess
+import os
 from pathlib import Path
 import httpx
 import structlog
@@ -43,4 +44,8 @@ class ProjectBuilder:
             str(cpp_source_dir / "Config.cpp"),
             "-o", str(engine_bin)
         ]
-        subprocess.run(cpp_cmd, cwd=self.settings.project_root, check=True)
+        build_tmp = self.settings.project_root / ".build_tmp"
+        build_tmp.mkdir(exist_ok=True)
+        env = os.environ.copy()
+        env["TMPDIR"] = str(build_tmp)
+        subprocess.run(cpp_cmd, cwd=self.settings.project_root, check=True, env=env)
