@@ -175,27 +175,21 @@ int main() {
 #ifdef DEBUG_TIMING
             ts.dqbuf_out_ms.push_back(ms_since(t0_dqbuf_out));
 #endif
-            while (true) {
-                int enc_out_idx = encoder.dequeueOutputBuffer();
-                if (enc_out_idx == -1) break;
+            if (enc_out_idx != -1) {
                 capture.queueBuffer(enc_out_idx);
             }
 
             if (fds[1].revents & POLLIN) {
-                while (true) {
-                    uint32_t h264_bytes = 0;
-                    struct timeval enc_ts = {};
+                uint32_t h264_bytes = 0;
+                struct timeval enc_ts = {};
 #ifdef DEBUG_TIMING
-                    auto t0_dqbuf_enc_cap = clk::now();
+                auto t0_dqbuf_enc_cap = clk::now();
 #endif
-                    int enc_cap_idx = encoder.dequeueCaptureBuffer(h264_bytes, enc_ts);
+                int enc_cap_idx = encoder.dequeueCaptureBuffer(h264_bytes, enc_ts);
 #ifdef DEBUG_TIMING
-                    if (enc_cap_idx != -1) ts.dqbuf_enc_cap_ms.push_back(ms_since(t0_dqbuf_enc_cap));
+                if (enc_cap_idx != -1) ts.dqbuf_enc_cap_ms.push_back(ms_since(t0_dqbuf_enc_cap));
 #endif
-                    if (enc_cap_idx == -1) {
-                        break;
-                    }
-
+                if (enc_cap_idx != -1) {
                     void* frame_data = encoder.getCaptureBufferPointer(enc_cap_idx);
                     if (frame_data && h264_bytes > 0) {
 #ifdef DEBUG_TIMING
