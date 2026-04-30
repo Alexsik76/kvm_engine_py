@@ -104,7 +104,7 @@ bool EncoderDevice::setupH264Controls() {
     struct v4l2_ext_control ctrls[6] = {};
 
     ctrls[0].id    = V4L2_CID_MPEG_VIDEO_BITRATE_MODE;
-    ctrls[0].value = V4L2_MPEG_VIDEO_BITRATE_MODE_CBR;
+    ctrls[0].value = V4L2_MPEG_VIDEO_BITRATE_MODE_VBR;
 
     ctrls[1].id    = V4L2_CID_MPEG_VIDEO_BITRATE;
     ctrls[1].value = Config::data.encoder.bitrate;
