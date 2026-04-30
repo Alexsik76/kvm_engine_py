@@ -36,7 +36,7 @@ class ProjectBuilder:
         cpp_source_dir = self.settings.project_root / "src" / "video_engine"
         cpp_include_dir = cpp_source_dir / "include"
         cpp_cmd = [
-            "g++", "-O2", "-mcpu=cortex-a72", "-mtune=cortex-a72", "-DDEBUG_TIMING",
+            "g++", "-O2", "-mcpu=cortex-a72", "-mtune=cortex-a72",
             "-I", str(cpp_include_dir),
             str(cpp_source_dir / "main.cpp"), 
             str(cpp_source_dir / "CaptureDevice.cpp"), 
