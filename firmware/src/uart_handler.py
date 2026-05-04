@@ -1,6 +1,7 @@
 import protocol
 import pulse
 import config
+import indicator
 
 
 class UartHandler:
@@ -91,6 +92,7 @@ class UartHandler:
                     "protocol":   config.PROTOCOL_VERSION,
                 })
                 self._ping_ready = True
+                indicator.set_color(0, 10, 0)  # Green color
                 config.log("INFO", "ping received, pong sent")
 
             elif t == "power_press":

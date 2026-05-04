@@ -14,7 +14,7 @@ def start_sampling():
     global _pwr_pin, _hdd_pin, _timer, _pwr_samples, _hdd_samples
 
     _pwr_pin     = Pin(config.PWR_LED_PIN, Pin.IN, Pin.PULL_UP)
-    _hdd_pin     = Pin(config.HDD_LED_PIN, Pin.IN, Pin.PULL_UP)
+    _hdd_pin     = Pin(config.HDD_LED_PIN, Pin.IN, Pin.PULL_UP) 
     _pwr_samples = []
     _hdd_samples = []
 
@@ -40,8 +40,8 @@ def _sample_isr(t):
 def _do_sample(arg):
     if _pwr_pin is None or _hdd_pin is None:
         return
-    _pwr_samples.append(_pwr_pin.value())
-    _hdd_samples.append(_hdd_pin.value())
+    _pwr_samples.append(1 - _pwr_pin.value())
+    _hdd_samples.append(1 - _hdd_pin.value())
     # Trim to WINDOW_SIZE — pop(0) is O(n) but list is short (≤300)
     if len(_pwr_samples) > config.WINDOW_SIZE:
         del _pwr_samples[0]
@@ -53,12 +53,11 @@ def _do_sample(arg):
 def _classify_pwr(samples):
     if len(samples) < config.WINDOW_SIZE:
         return "unknown"
-    transitions = sum(1 for i in range(1, len(samples)) if samples[i] != samples[i - 1])
-    if transitions >= 2:
-        return "blinking"
-    if all(s == 0 for s in samples):
+    if all(s == 1 for s in samples):
         return "on"
-    return "off"
+    if all(s == 0 for s in samples):
+        return "off"
+    return "blinking"
 
 
 def _classify_hdd(samples):
