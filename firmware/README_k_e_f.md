@@ -13,20 +13,28 @@ a target PC, and reads PWR_LED / HDD_LED states back to the host.
 Communication with the Raspberry Pi 4 host (`kvm_engine_py`) happens over UART
 at 115200 baud using a line-delimited JSON protocol.
 
-Full protocol specification: [`docs/uart_protocol.md`](docs/uart_protocol.md)
+Full protocol specification: [`uart_protocol.md`](uart_protocol.md)
+
+## Status Indication (RGB LED)
+
+The built-in RGB LED (NeoPixel on GP16) shows the current board state:
+
+*   **Steady Blue:** Board has booted and is waiting for the first `ping` command from the host.
+*   **3 Green Flashes:** Received a valid `ping` command. This happens only once per session to confirm the connection has been established.
+*   **Steady Blue (after flashes):** Normal operation. The board does not continuously track the UART connection state after the initial handshake; it remains in operational mode even if the host is disconnected (though it will stop sending `led_status` updates until the next power cycle or `ping`).
 
 ## File layout
 
 ```
 firmware/
-├── docs/
-│   └── uart_protocol.md   # communication contract (read this first)
+├── uart_protocol.md   # communication contract (read this first)
 ├── src/
 │   ├── main.py            # entry-point; runs automatically on boot
 │   ├── config.py          # all pin numbers, durations, constants
 │   ├── protocol.py        # JSON frame parsing / serialisation
 │   ├── pulse.py           # non-blocking Timer-based pulse generator
 │   ├── leds.py            # 5 ms sampler + 1500 ms window classifier
+│   ├── indicator.py       # RGB LED control (NeoPixel)
 │   └── uart_handler.py    # UART accumulator + command dispatcher
 └── tools/
     ├── flash_instructions.md  # how to flash the board via Thonny

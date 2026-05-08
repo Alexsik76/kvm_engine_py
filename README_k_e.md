@@ -6,21 +6,48 @@ A unified orchestrator for Raspberry Pi 4 IP-KVM, managing hardware-accelerated 
 
 The system follows an **Event-Driven Orchestrator** pattern, where Python acts as the "brain" managing high-performance components:
 
-- **Hardware Layer (`app/hardware/`)**: Native Python implementation for Linux ConfigFS (USB Gadget) and V4L2 (Video Bridge) initialization. Replaces legacy Shell scripts. Includes optional front-panel module (`front_panel.py`) for RP2040-Zero UART integration.
+- **Hardware Layer (`app/hardware/`)**: Native Python implementation for Linux ConfigFS (USB Gadget) and V4L2 (Video Bridge) initialization. Includes optional front-panel module (`front_panel.py`) for RP2040-Zero UART integration.
 - **Service Layer (`app/services/`)**: 
     - `ProjectBuilder`: Automated C++ (GCC) compiler orchestration.
-    - `ServiceManager`: Asyncio-based lifecycle management for background processes.
+    - `ServiceManager`: Asyncio-based lifecycle management for background processes (`MediaMTX`, WebSocket server, and hardware monitors).
 - **WebSocket Layer (`app/ws/`)**: Single shared `WSServer` (aiohttp) listening on one port. All WebSocket routes (`/ws/control`, `/ws/front_panel`) and HTTP routes (`POST /ws/wake`) are registered on it at startup. JWT-authenticated.
-- **HID Layer (`app/hid/`)**: Keyboard and mouse emulation over HID gadget. Registers `/ws/control` on the shared `WSServer`; does not own the server lifecycle.
+- **HID Layer (`app/hid/`)**: Translates incoming WebSocket commands into low-level USB HID reports (keyboard and mouse) written directly to the Linux ConfigFS gadget endpoints (`/dev/hidg0`, `/dev/hidg1`).
 - **Execution Layer (`src/`)**:
-    - `video_engine` (C++): Hardware-accelerated H.264 encoding via V4L2.
+    - `kvm_engine` (C++): Hardware-accelerated H.264 encoding via V4L2.
     - `MediaMTX`: High-efficiency WebRTC/RTSP streaming server.
+
+## Video Pipeline (Zero-Copy)
+
+The most critical part of the system is the low-latency video transmission pipeline. The signal flows through several hardware and software layers before reaching the client's browser:
+
+```mermaid
+graph TD
+    A[Target PC<br/>HDMI] -->|HDMI Cable| B(TC358743 Bridge)
+    B -->|MIPI CSI-2| C{V4L2 Subsystem<br/>/dev/video0}
+    C -->|Raw UYVY Frames| D((kvm_engine<br/>C++ Binary))
+    D -.->|DMABUF Zero-Copy| E[Hardware H.264 Encoder<br/>/dev/video11]
+    E -.->|Compressed H.264| D
+    D -->|Raw H.264 via stdout| F(FFmpeg<br/>start_ffmpeg.sh)
+    F -->|RTSP with PTS/DTS| G[MediaMTX]
+    G -->|WebRTC| H((Client Browser))
+
+    classDef hardware fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef software fill:#bbf,stroke:#333,stroke-width:2px;
+    class A,B,E hardware;
+    class D,F,G software;
+```
+
+1. **Target PC (HDMI)** → Physical HDMI cable connected to the capture board.
+2. **TC358743 Bridge**: Hardware chip that converts HDMI to MIPI CSI-2. Initialized by `HardwareManager` (`app/hardware/manager.py`) via V4L2 to expose `/dev/video0`.
+3. **`kvm_engine` (C++)**: Custom high-performance binary (`src/video_engine/`). It captures raw frames from `/dev/video0` and pipes them directly to the Raspberry Pi's hardware H.264 encoder (e.g., `/dev/video11`) using a zero-copy DMABUF mechanism. It outputs a raw H.264 stream to `stdout`.
+4. **FFmpeg (`start_ffmpeg.sh`)**: Acts as a lightweight wrapper. It reads the raw H.264 from `kvm_engine` via stdin (`|`), attaches correct PTS/DTS timing data without re-encoding (`-c:v copy`), and pushes it as an RTSP stream.
+5. **MediaMTX**: An ultra-fast streaming server triggered on-demand (`config/mediamtx.yml`). It receives the RTSP stream from FFmpeg and serves it to the client's browser using **WebRTC** for sub-second latency.
 
 ## Component Interaction
 
-1. **Initialization**: Validates `.env` settings via Pydantic and configures Hardware (USB HID Gadgets & Video Bridge).
-2. **Build**: Compiles C++ and Go binaries if requested.
-3. **Runtime**: Orchestrates `mediamtx`, the shared `WSServer`, HID logic, and the optional front-panel UART bridge as concurrent asyncio tasks inside a single `TaskGroup`. `MediaMTX` triggers the `video_engine` pipeline via internal configuration.
+1. **Initialization**: Validates `config.json` settings via Pydantic and configures Hardware (USB HID Gadgets & Video Bridge).
+2. **Build**: Compiles C++ binaries if requested.
+3. **Runtime**: Orchestrates `mediamtx`, the shared `WSServer`, HID logic, and the optional front-panel UART bridge as concurrent asyncio tasks inside a single `TaskGroup`. `MediaMTX` triggers the `kvm_engine` pipeline via internal configuration.
 4. **Shutdown**: Graceful termination of all subprocesses and resource cleanup via Context Managers.
 
 ## Usage
