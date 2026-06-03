@@ -62,13 +62,29 @@ int main() {
             }
 
             if (ret == 0) {
-                struct v4l2_dv_timings timings;
-                if (ioctl(capture.getFd(), VIDIOC_QUERY_DV_TIMINGS, &timings) != 0) {
-                    std::cerr << "Signal physically lost. Exiting for fallback..." << std::endl;
-                    return 1;
-                }
-                continue;
+    struct v4l2_dv_timings timings;
+    if (ioctl(capture.getFd(), VIDIOC_QUERY_DV_TIMINGS, &timings) != 0) {
+        std::cerr << "Signal lost, waiting for re-lock (not exiting)..." << std::endl;
+        capture.stopStreaming();
+
+        // чекати повернення сигналу, не виходячи і не закриваючи stdout
+        while (keepRunning) {
+            if (ioctl(capture.getFd(), VIDIOC_QUERY_DV_TIMINGS, &timings) == 0) {
+                break;  // сигнал повернувся
             }
+            usleep(200000);  // 200 мс
+        }
+        if (!keepRunning) return 0;
+
+        // та сама роздільність (EDID фіксований) → формат не міняємо
+        if (!capture.resumeStreaming()) {
+            std::cerr << "Resume failed, exiting for supervisor restart." << std::endl;
+            return 1;  // запобіжник: якщо щось пішло не так — старий шлях
+        }
+        std::cerr << "Signal re-locked, streaming resumed." << std::endl;
+    }
+    continue;
+}
 
             if (fds[0].revents & POLLIN) {
                 uint32_t bytes_used = 0;

@@ -9,21 +9,23 @@ authInternalUsers:
         path: kvm
 webrtc: true
 
-# alt config 1
-# webrtcLocalUDPAddress: :30000
+# For external access and dstnat udp port 30000 on the router
 # webrtcAdditionalHosts: ["79.143.43.173"]
 
-# alt config 2
+# local config
 webrtcLocalUDPAddress: :30000
-webrtcICEServers2:
-  - url: stun:stun.l.google.com:19302
-  - url: stun:stun1.l.google.com:19302
+webrtcIPsFromInterfaces: yes
+webrtcIPsFromInterfacesList: [eth0]
+# webrtcICEServers2:
+#   - url: stun:stun.l.google.com:19302
+#   - url: stun:stun1.l.google.com:19302
 
 paths:
   kvm:
     runOnDemand: /home/alex/kvm_engine_py/start_ffmpeg.sh
+    runOnDemandStartTimeout: 10s
     runOnDemandCloseAfter: 10s
     runOnDemandRestart: true
-    #alwaysAvailable: true
+    # alwaysAvailable: true
     #alwaysAvailableTracks:
     #  - codec: H264

@@ -137,7 +137,7 @@ class HardwareManager:
             try:
                 proc = await asyncio.create_subprocess_exec(
                     "v4l2-ctl", "-d", self.settings.video_device,
-                    "--set-edid", f"pad=0,file={self.settings.edid_path},format=raw",
+                    "--set-edid", f"pad=0,file={self.settings.edid_path}",
                     stderr=asyncio.subprocess.PIPE,
                 )
                 await proc.communicate()

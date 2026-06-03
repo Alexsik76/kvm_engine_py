@@ -134,3 +134,20 @@ int CaptureDevice::getExportFd(size_t index) const {
 }
 
 int CaptureDevice::getFd() const { return fd; }
+
+bool CaptureDevice::stopStreaming() {
+    int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    return (ioctl(fd, VIDIOC_STREAMOFF, &type) != -1);
+}
+
+bool CaptureDevice::resumeStreaming() {
+    for (size_t i = 0; i < buffers.size(); ++i) {
+        struct v4l2_buffer buf = {};
+        buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        buf.memory = V4L2_MEMORY_MMAP;
+        buf.index  = i;
+        if (ioctl(fd, VIDIOC_QBUF, &buf) == -1) return false;
+    }
+    int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    return (ioctl(fd, VIDIOC_STREAMON, &type) != -1);
+}

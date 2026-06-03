@@ -42,6 +42,8 @@ public:
 
     int getExportFd(size_t index) const;
     int getFd() const;
+    bool stopStreaming();
+    bool resumeStreaming();;
 };
 
 #endif
