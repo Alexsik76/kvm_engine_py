@@ -75,11 +75,11 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def compute_defaults(self) -> "Settings":
         if not self.project_root:
-            self.project_root = Path(f"/home/{self.device_user}/kvm_engine_py")
+            self.project_root = Path(__file__).resolve().parent.parent
         if not self.mediamtx_path:
-            self.mediamtx_path = Path(f"/home/{self.device_user}/mediamtx")
+            self.mediamtx_path = self.project_root.parent / "mediamtx"
         if not self.edid_path:
-            self.edid_path = Path(f"/home/{self.device_user}/TC358743-Driver/720p60edid")
+            self.edid_path = self.project_root / "config" / "720p60edid"
         return self
 
     def render_configs(self) -> None:
