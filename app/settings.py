@@ -47,6 +47,23 @@ class Settings(BaseSettings):
     device_password_hash: str = ""
     access_token_minutes: int = 30
     refresh_token_minutes: int = 10080
+    node_id: str = "self"
+    node_name: str = "kvm-ipi"
+    stream_name: str = "kvm"
+    has_front_panel: bool = True
+    machine_info: Optional[dict] = None
+
+    @field_validator("machine_info", mode="before")
+    @classmethod
+    def parse_machine_info(cls, v) -> Optional[dict]:
+        if isinstance(v, str):
+            if not v.strip():
+                return None
+            try:
+                return json.loads(v)
+            except Exception:
+                return {"info": v}
+        return v
 
     @property
     def cors_origins_list(self) -> list[str]:

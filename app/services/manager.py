@@ -37,6 +37,14 @@ class ServiceManager:
         self.ws_server.add_route("POST", "/api/v1/auth/refresh", refresh_handler)
         self.ws_server.add_route("POST", "/auth/refresh", refresh_handler)
 
+        from app.auth.node_handlers import nodes_list_handler, node_detail_handler, node_status_handler
+        self.ws_server.add_route("GET", "/api/v1/nodes", nodes_list_handler)
+        self.ws_server.add_route("GET", "/nodes", nodes_list_handler)
+        self.ws_server.add_route("GET", "/api/v1/nodes/{node_id}", node_detail_handler)
+        self.ws_server.add_route("GET", "/nodes/{node_id}", node_detail_handler)
+        self.ws_server.add_route("GET", "/api/v1/nodes/{node_id}/status", node_status_handler)
+        self.ws_server.add_route("GET", "/nodes/{node_id}/status", node_status_handler)
+
         if hw_manager is not None:
             from app.hardware.wake_handler import make_wake_handler
             self.ws_server.add_route(

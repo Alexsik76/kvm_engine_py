@@ -35,6 +35,8 @@ class WSServer:
         self.app = web.Application(middlewares=[cors_middleware])
         if settings is not None:
             self.app['settings'] = settings
+        import datetime
+        self.app['created_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
         self.runner: web.AppRunner | None = None
         self.site: web.TCPSite | None = None
         self._stop_event: asyncio.Event | None = None
