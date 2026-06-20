@@ -41,11 +41,11 @@ graph TD
 2. **TC358743 Bridge**: Hardware chip that converts HDMI to MIPI CSI-2. Initialized by `HardwareManager` (`app/hardware/manager.py`) via V4L2 to expose `/dev/video0`.
 3. **`kvm_engine` (C++)**: Custom high-performance binary (`src/video_engine/`). It captures raw frames from `/dev/video0` and pipes them directly to the Raspberry Pi's hardware H.264 encoder (e.g., `/dev/video11`) using a zero-copy DMABUF mechanism. It outputs a raw H.264 stream to `stdout`.
 4. **FFmpeg (`start_ffmpeg.sh`)**: Acts as a lightweight wrapper. It reads the raw H.264 from `kvm_engine` via stdin (`|`), attaches correct PTS/DTS timing data without re-encoding (`-c:v copy`), and pushes it as an RTSP stream.
-5. **MediaMTX**: An ultra-fast streaming server triggered on-demand (`config/mediamtx.yml`). It receives the RTSP stream from FFmpeg and serves it to the client's browser using **WebRTC** for sub-second latency.
+5. **MediaMTX**: An ultra-fast streaming server triggered on-demand (`config/mediamtx.yml`). It receives the RTSP stream from FFmpeg and serves it to the client's browser using **WebRTC** for sub-second latency. (Note: `mediamtx.yml` is generated dynamically from `config/mediamtx.yml.j2` at startup).
 
 ## Component Interaction
 
-1. **Initialization**: Validates `config.json` settings via Pydantic and configures Hardware (USB HID Gadgets & Video Bridge).
+1. **Initialization**: Loads configuration from the environment and `.env` using Pydantic Settings, dynamically generates the necessary configuration files (`config.json` and `mediamtx.yml`), and configures Hardware (USB HID Gadgets & Video Bridge).
 2. **Build**: Compiles C++ binaries if requested.
 3. **Runtime**: Orchestrates `mediamtx`, the shared `WSServer`, HID logic, and the optional front-panel UART bridge as concurrent asyncio tasks inside a single `TaskGroup`. `MediaMTX` triggers the `kvm_engine` pipeline via internal configuration.
 4. **Shutdown**: Graceful termination of all subprocesses and resource cleanup via Context Managers.
@@ -111,15 +111,15 @@ An optional hardware add-on based on the RP2040-Zero microcontroller provides re
 
 **Startup behavior:** At boot, `kvm_engine_py` probes the UART port with up to 5 ping attempts (exponential back-off: 200 → 3000 ms). If the board is not detected, the subsystem is disabled with a `WARN` log entry and all other services continue normally.
 
-**Configuration** (via `config/config.json` or defaults):
+**Configuration** (via `.env` variables):
 
-| Key | Default | Description |
+| Env Variable | Default | Description |
 |---|---|---|
-| `front_panel_enabled` | `true` | Set to `false` to skip probe entirely |
-| `front_panel_port` | `/dev/ttyAMA0` | UART device path (Linux only) |
-| `front_panel_baudrate` | `115200` | Baud rate |
+| `KVM_FRONT_PANEL_ENABLED` | `true` | Set to `false` to skip probe entirely |
+| `KVM_FRONT_PANEL_PORT` | `/dev/ttyAMA0` | UART device path (Linux only) |
+| `KVM_FRONT_PANEL_BAUDRATE` | `115200` | Baud rate |
 
-On Windows / development machines without UART hardware, the probe fails gracefully — set `front_panel_enabled: false` in your config or run with the default (probe will time out and disable itself automatically).
+On Windows / development machines without UART hardware, the probe fails gracefully — set `KVM_FRONT_PANEL_ENABLED=false` in your `.env` or run with the default (probe will time out and disable itself automatically).
 
 **WebSocket API** (same port as HID, default `8080`):
 
@@ -145,5 +145,10 @@ A slow client (send blocked > 1 s) is disconnected. Invalid or missing JWT → H
 Protocol details: `firmware/docs/uart_protocol.md`.
 
 ## Configuration
-- `config/config.json`: Service parameters (paths, HID ports, front-panel settings).
-- `config/mediamtx.yml`: Streaming server and ffmpeg pipeline settings.
+
+The system is configured using environment variables, typically loaded from a `.env` file at the root of the project.
+
+Key files:
+- `.env`: The single source of truth for all deployment settings and secrets. Refer to `.env.example` for details.
+- `config/config.json.example`: Static structure template for the C++ video engine. The actual `config.json` is generated dynamically on startup.
+- `config/mediamtx.yml.j2`: Jinja2 template for MediaMTX configuration. The actual `mediamtx.yml` is generated dynamically on startup.

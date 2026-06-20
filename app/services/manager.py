@@ -31,6 +31,12 @@ class ServiceManager:
             ),
         )
 
+        from app.auth.handlers import login_handler, refresh_handler
+        self.ws_server.add_route("POST", "/api/v1/auth/login", login_handler)
+        self.ws_server.add_route("POST", "/auth/login", login_handler)
+        self.ws_server.add_route("POST", "/api/v1/auth/refresh", refresh_handler)
+        self.ws_server.add_route("POST", "/auth/refresh", refresh_handler)
+
         if hw_manager is not None:
             from app.hardware.wake_handler import make_wake_handler
             self.ws_server.add_route(

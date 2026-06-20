@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     webrtc_iface: str = "eth0"
     rtsp_server: str = "127.0.0.1:8554"
     cors_allowed_origins: str = ""
+    device_user_login: str = "kvm"
+    device_password_hash: str = ""
+    access_token_minutes: int = 30
+    refresh_token_minutes: int = 10080
 
     @property
     def cors_origins_list(self) -> list[str]:
