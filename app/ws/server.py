@@ -17,7 +17,7 @@ async def cors_middleware(request, handler):
     origin = request.headers.get('Origin')
 
     if settings and origin:
-        if origin in settings.cors_allowed_origins:
+        if origin in settings.cors_origins_list:
             response.headers['Access-Control-Allow-Origin'] = origin
             response.headers['Access-Control-Allow-Credentials'] = 'true'
 

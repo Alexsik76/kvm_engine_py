@@ -42,16 +42,13 @@ class Settings(BaseSettings):
     enable_stun: bool = False
     webrtc_iface: str = "eth0"
     rtsp_server: str = "127.0.0.1:8554"
-    cors_allowed_origins: list[str] = []
+    cors_allowed_origins: str = ""
 
-    @field_validator("cors_allowed_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v) -> list[str]:
-        if isinstance(v, str):
-            if not v.strip():
-                return []
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    @property
+    def cors_origins_list(self) -> list[str]:
+        if not self.cors_allowed_origins.strip():
+            return []
+        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
 
     @model_validator(mode="after")
     def compute_defaults(self) -> "Settings":
