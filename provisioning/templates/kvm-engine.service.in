@@ -1,0 +1,18 @@
+[Unit]
+Description=KVM-over-IP engine (capture, HID, streaming orchestrator)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# root is required: USB gadget configfs (/sys/kernel/config) and /dev/hidg*.
+User=root
+WorkingDirectory=__PROJECT_ROOT__
+ExecStart=__PROJECT_ROOT__/.venv/bin/python -m app.main run
+Restart=on-failure
+RestartSec=5
+# Give the engine time to tear down the USB gadget cleanly on restart.
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
