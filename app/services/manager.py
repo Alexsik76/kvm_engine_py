@@ -45,6 +45,12 @@ class ServiceManager:
         self.ws_server.add_route("GET", "/api/v1/nodes/{node_id}/status", node_status_handler)
         self.ws_server.add_route("GET", "/nodes/{node_id}/status", node_status_handler)
 
+        from app.auth.signaling_handlers import signal_offer_handler, signal_ice_handler
+        self.ws_server.add_route("POST", "/api/v1/nodes/{node_id}/signal/offer", signal_offer_handler)
+        self.ws_server.add_route("POST", "/nodes/{node_id}/signal/offer", signal_offer_handler)
+        self.ws_server.add_route("POST", "/api/v1/nodes/{node_id}/signal/ice", signal_ice_handler)
+        self.ws_server.add_route("POST", "/nodes/{node_id}/signal/ice", signal_ice_handler)
+
         if hw_manager is not None:
             from app.hardware.wake_handler import make_wake_handler
             self.ws_server.add_route(

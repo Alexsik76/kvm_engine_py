@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     mediamtx_user: str = "kvm_user"
     mediamtx_pass: str = ""
+    mediamtx_webrtc_address: str = "127.0.0.1:8889"
     access_mode: str = "lan"
     public_host: str = ""
     webrtc_udp_port: int = 30000
