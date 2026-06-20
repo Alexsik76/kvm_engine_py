@@ -20,17 +20,17 @@ pprof: false
 playback: false
 
 # Disable unused protocols
-rtmpDisable: yes
-hlsDisable: yes
-srtDisable: yes
+rtmp: no
+hls: no
+srt: no
 
 # RTSP loopback on localhost over TCP only
-rtspDisable: no
+rtsp: yes
 rtspAddress: 127.0.0.1:8554
-protocols: [tcp]
+rtspTransports: [tcp]
 
 # WebRTC streaming
-webrtcDisable: no
+webrtc: yes
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :{{ webrtc_udp_port }}
 webrtcIPsFromInterfaces: yes
