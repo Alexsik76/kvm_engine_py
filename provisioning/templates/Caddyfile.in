@@ -1,0 +1,30 @@
+# Caddyfile (rendered by 70_caddy.sh) — single-origin front for the KVM device.
+#
+# Listens on plain HTTP :80 (LAN). No TLS here: a .lan name gets no public cert,
+# and a self-signed one only nags the browser. HTTPS is provided EXTERNALLY by
+# Tailscale Serve / Cloudflare when that optional layer is added; the SPA already
+# switches ws->wss based on the page scheme, so the same build works behind both.
+#
+# Routing:
+#   /api/*  -> engine (auth, nodes, signaling)         on 127.0.0.1:8080
+#   /ws/*   -> engine (control, front_panel, wake) WS  on 127.0.0.1:8080
+#   else    -> static SPA from __WEB_ROOT__, with history-mode fallback
+#
+# reverse_proxy upgrades WebSockets transparently in Caddy v2 — no extra config.
+# WebRTC media (UDP) does NOT pass through here; it goes straight to the Pi:30000.
+
+:80 {
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle /ws/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle {
+		root * __WEB_ROOT__
+		try_files {path} /index.html
+		file_server
+	}
+}

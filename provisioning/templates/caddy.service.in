@@ -1,0 +1,18 @@
+[Unit]
+Description=Caddy (single-origin reverse proxy + SPA for KVM device)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+# Runs as the device user (not root); the capability below lets it bind :80.
+User=__CADDY_USER__
+Group=__CADDY_USER__
+ExecStart=/usr/local/bin/caddy run --config /etc/caddy/Caddyfile
+ExecReload=/usr/local/bin/caddy reload --config /etc/caddy/Caddyfile --force
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

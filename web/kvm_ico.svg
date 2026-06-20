@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#0d1117" stroke="#1a3a2a" stroke-width="2"/>
+
+  <!-- Server/mainboard body -->
+  <rect x="20" y="36" width="88" height="56" rx="6" fill="#0f2318" stroke="#22c55e" stroke-width="1.5"/>
+
+  <!-- Screen / display area (outer VM frame) -->
+  <rect x="28" y="44" width="52" height="36" rx="3" fill="#061209" stroke="#22c55e" stroke-width="1.2"/>
+
+  <!-- Inner nested VM rectangle (virtualization symbol) -->
+  <rect x="34" y="50" width="38" height="24" rx="2" fill="none" stroke="#4ade80" stroke-width="1" stroke-dasharray="4 2"/>
+
+  <!-- Nested inner VM (second layer) -->
+  <rect x="40" y="55" width="26" height="14" rx="2" fill="none" stroke="#86efac" stroke-width="1"/>
+
+  <!-- "VM" text inside -->
+  <text x="47" y="65" font-family="monospace" font-size="8" fill="#22c55e" font-weight="bold">VM</text>
+
+  <!-- CPU chip on the right -->
+  <rect x="86" y="47" width="16" height="16" rx="2" fill="#0f2318" stroke="#22c55e" stroke-width="1.2"/>
+  <!-- Chip pins top/bottom -->
+  <line x1="90" y1="47" x2="90" y2="44" stroke="#4ade80" stroke-width="1"/>
+  <line x1="94" y1="47" x2="94" y2="44" stroke="#4ade80" stroke-width="1"/>
+  <line x1="98" y1="47" x2="98" y2="44" stroke="#4ade80" stroke-width="1"/>
+  <line x1="90" y1="63" x2="90" y2="66" stroke="#4ade80" stroke-width="1"/>
+  <line x1="94" y1="63" x2="94" y2="66" stroke="#4ade80" stroke-width="1"/>
+  <line x1="98" y1="63" x2="98" y2="66" stroke="#4ade80" stroke-width="1"/>
+  <!-- Chip pins left/right -->
+  <line x1="86" y1="51" x2="83" y2="51" stroke="#4ade80" stroke-width="1"/>
+  <line x1="86" y1="55" x2="83" y2="55" stroke="#4ade80" stroke-width="1"/>
+  <line x1="102" y1="51" x2="105" y2="51" stroke="#4ade80" stroke-width="1"/>
+  <line x1="102" y1="55" x2="105" y2="55" stroke="#4ade80" stroke-width="1"/>
+  <!-- Chip inner grid -->
+  <rect x="89" y="50" width="8" height="8" rx="1" fill="#042008" stroke="#22c55e" stroke-width="0.8"/>
+
+  <!-- Circuit trace lines -->
+  <line x1="80" y1="56" x2="86" y2="56" stroke="#166534" stroke-width="1"/>
+  <line x1="80" y1="60" x2="86" y2="60" stroke="#166534" stroke-width="1"/>
+
+  <!-- Bottom server slots -->
+  <rect x="28" y="84" width="16" height="4" rx="1" fill="#166534"/>
+  <rect x="48" y="84" width="16" height="4" rx="1" fill="#166534"/>
+  <rect x="68" y="84" width="16" height="4" rx="1" fill="#166534"/>
+
+  <!-- Status LED dot -->
+  <circle cx="102" cy="70" r="3" fill="#22c55e" opacity="0.9"/>
+  <circle cx="102" cy="70" r="5" fill="none" stroke="#22c55e" stroke-width="0.5" opacity="0.4"/>
+
+  <!-- "KVM" label at bottom -->
+  <text x="64" y="112" font-family="monospace" font-size="10" fill="#22c55e" font-weight="bold" text-anchor="middle" letter-spacing="3">KVM</text>
+</svg>
