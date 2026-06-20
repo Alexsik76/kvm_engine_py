@@ -15,7 +15,7 @@ log = structlog.get_logger()
 class ServiceManager:
     def __init__(self, settings, hw_manager=None):
         self.settings = settings
-        self.ws_server = WSServer(port=settings.hid_port)
+        self.ws_server = WSServer(port=settings.hid_port, settings=settings)
         self.video_monitor = VideoSignalMonitor(
             device_path=settings.video_device.replace("video", "v4l-subdev")
         )
@@ -40,11 +40,12 @@ class ServiceManager:
             )
 
     @asynccontextmanager
-    async def run_process(self, name: str, command: list, cwd: str | None = None):
+    async def run_process(self, name: str, command: list, cwd: str | None = None, env: dict | None = None):
         log.info("service_starting", name=name, command=" ".join(command))
         proc = await asyncio.create_subprocess_exec(
             *command,
             cwd=str(cwd) if cwd else None,
+            env=env,
         )
         try:
             yield proc
@@ -72,7 +73,12 @@ class ServiceManager:
             tg.create_task(self._run_video_monitor())
 
     async def _run_mediamtx(self, cmd):
-        async with self.run_process("mediamtx", cmd, cwd=self.settings.mediamtx_path) as proc:
+        import os
+        env = os.environ.copy()
+        for key, value in self.settings.model_dump().items():
+            env_key = f"KVM_{key.upper()}"
+            env[env_key] = str(value) if value is not None else ""
+        async with self.run_process("mediamtx", cmd, cwd=self.settings.mediamtx_path, env=env) as proc:
             await proc.wait()
 
     async def _run_ws_server(self):

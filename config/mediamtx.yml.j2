@@ -1,0 +1,54 @@
+# MediaMTX Configuration for Autonomous Mode (v1.16.2)
+logLevel: info
+logDestinations: [stdout]
+
+# Authentication
+authMethod: internal
+authInternalUsers:
+  - user: {{ mediamtx_user }}
+    pass: {{ mediamtx_pass }}
+    permissions:
+      - action: read
+        path: kvm
+      - action: publish
+        path: kvm
+
+# Disable unused modules
+api: false
+metrics: false
+pprof: false
+playback: false
+
+# Disable unused protocols
+rtmpDisable: yes
+hlsDisable: yes
+srtDisable: yes
+
+# RTSP loopback on localhost over TCP only
+rtspDisable: no
+rtspAddress: 127.0.0.1:8554
+protocols: [tcp]
+
+# WebRTC streaming
+webrtcDisable: no
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :{{ webrtc_udp_port }}
+webrtcIPsFromInterfaces: yes
+webrtcIPsFromInterfacesList: [{{ webrtc_iface }}]
+
+{% if webrtc_additional_hosts %}
+webrtcAdditionalHosts: [{{ webrtc_additional_hosts }}]
+{% endif %}
+
+{% if enable_stun %}
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+  - url: stun:stun1.l.google.com:19302
+{% endif %}
+
+paths:
+  kvm:
+    runOnDemand: {{ project_root }}/start_ffmpeg.sh
+    runOnDemandStartTimeout: 10s
+    runOnDemandCloseAfter: 10s
+    runOnDemandRestart: true

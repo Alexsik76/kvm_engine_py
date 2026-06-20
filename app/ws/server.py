@@ -13,7 +13,14 @@ async def cors_middleware(request, handler):
     else:
         response = await handler(request)
 
-    response.headers['Access-Control-Allow-Origin'] = 'https://kvm.lab.vn.ua' 
+    settings = request.app.get('settings')
+    origin = request.headers.get('Origin')
+
+    if settings and origin:
+        if origin in settings.cors_allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+
     response.headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
     
@@ -22,10 +29,12 @@ async def cors_middleware(request, handler):
 class WSServer:
     """Independent, reusable HTTP/WebSocket server backed by aiohttp."""
 
-    def __init__(self, host: str = "0.0.0.0", port: int = 8080):
+    def __init__(self, host: str = "0.0.0.0", port: int = 8080, settings=None):
         self.host = host
         self.port = port
         self.app = web.Application(middlewares=[cors_middleware])
+        if settings is not None:
+            self.app['settings'] = settings
         self.runner: web.AppRunner | None = None
         self.site: web.TCPSite | None = None
         self._stop_event: asyncio.Event | None = None

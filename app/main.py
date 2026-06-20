@@ -30,6 +30,7 @@ def cli():
 def run(build: bool, no_hw: bool):
     """Start the KVM engine and all services"""
     settings = Settings.from_file()
+    settings.render_configs()
     log = structlog.get_logger()
 
     async def _startup():
@@ -73,6 +74,7 @@ def run(build: bool, no_hw: bool):
 def wake():
     """Send a wakeup signal to the host OS"""
     settings = Settings.from_file()
+    settings.render_configs()
     hw_manager = HardwareManager(settings)
     hw_manager.force_rebind_gadget()
     hw_manager.wake_host()

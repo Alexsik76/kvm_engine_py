@@ -1,12 +1,12 @@
 {
     "paths": {
-        "mediamtx": "/home/alex/mediamtx",
-        "edid": "/home/alex/TC358743-Driver/720p60edid",
+        "mediamtx": "/home/kvmowner/mediamtx",
+        "edid": "/home/kvmowner/TC358743-Driver/720p60edid",
         "kvm_engine_bin": "kvm_engine"
     },
     "hid": {
         "port": 8080,
-        "jwt_secret": "8a5241bc53f35df9406455d208efb806f20599b59fcfa031a2fa6fc8c411ccce",
+        "jwt_secret": "PLACEHOLDER_JWT_SECRET",
         "keyboard_device": "/dev/hidg0",
         "mouse_device": "/dev/hidg1"
     },

@@ -47,7 +47,7 @@ namespace Config {
     
     class Loader {
     public:
-        static ConfigData load(const std::string& path = "/home/alex/kvm_engine/config/config.json");
+        static ConfigData load(const std::string& path = "./config/config.json");
         
     public:
         static uint32_t parseFormat(const std::string& fmt);
