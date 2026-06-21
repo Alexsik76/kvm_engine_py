@@ -214,6 +214,13 @@ hardcoded.
   `enable_uart=1` + `dtoverlay=disable-bt` (front-panel UART on `/dev/ttyAMA0`),
   `gpu_mem=256`; the stock `dtoverlay=vc4-kms-v3d,cma-256` supplies CMA for DMABUF.
 - `/etc/modules-load.d/kvm-usb.conf`: `dwc2`, `libcomposite` (required for the HID gadget).
+A fresh Raspberry Pi OS image attaches a serial login console
+(`serial-getty@ttyAMA0`) to the UART that the RP2040 front panel uses. Left in
+place, that console keeps writing a login prompt into the microcontroller and
+fights the engine for the port, so the panel reports `unknown_command` and never
+shows PWR/HDD. The `10_boot_config` step now stops and masks this service
+(masking is required — a plain disable is undone by a systemd generator on the
+next boot). The change takes effect after a reboot.
 
 > Hardware target is the **Pi 4 Model B** — the C++ build uses `-mcpu=cortex-a72`.
 

@@ -67,5 +67,21 @@ else
   log "wrote ${MODULES_FILE} (dwc2, libcomposite)"
 fi
 
+# --- Free the UART from the serial login console (RP2040 front panel) -------
+# enable_uart=1 gives us the hardware UART, but Raspberry Pi OS still attaches a
+# login console (serial-getty@ttyAMA0) to it by default. That getty keeps writing
+# a login prompt into the RP2040 and competes with the engine for the port, so
+# the front panel reports garbage ("unknown_command") and never shows PWR/HDD.
+# mask is REQUIRED here: a plain disable is undone by a systemd generator that
+# re-creates the instance on the next boot. Idempotent.
+GETTY="serial-getty@ttyAMA0.service"
+if [[ "$(systemctl is-enabled "${GETTY}" 2>/dev/null)" == "masked" ]]; then
+  log "${GETTY} already masked (UART free for RP2040)"
+else
+  run systemctl stop "${GETTY}"
+  run systemctl mask "${GETTY}"
+  log "stopped + masked ${GETTY} (UART freed for RP2040)"
+fi
+
 warn "config.txt / modules changes take effect only AFTER a reboot."
 log "boot config step complete"
