@@ -12,9 +12,6 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    device_user: str = "kvmowner"
-    device_host: str = "kvm-ipi"
-
     project_root: Optional[Path] = None
     mediamtx_path: Optional[Path] = None
     edid_path: Optional[Path] = None
