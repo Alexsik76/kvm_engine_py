@@ -1,13 +1,14 @@
-import asyncio
-import json
 import base64
-import structlog
+import json
+
 import aiohttp
+import structlog
 from aiohttp import web
-from app.ws.server import WSServer
-from app.hid.manager import HIDManager
-from app.hid.auth import validate_access_token
+
 from app.config import Settings
+from app.hid.auth import validate_access_token
+from app.hid.manager import HIDManager
+from app.ws.server import WSServer
 
 log = structlog.get_logger()
 

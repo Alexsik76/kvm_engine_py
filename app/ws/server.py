@@ -1,7 +1,8 @@
 import asyncio
+from typing import Awaitable, Callable, Sequence
+
 import structlog
 from aiohttp import web
-from typing import Callable, Awaitable, Sequence
 
 log = structlog.get_logger()
 
@@ -30,7 +31,12 @@ class WSServer:
         self.site: web.TCPSite | None = None
         self._stop_event: asyncio.Event | None = None
 
-    def add_route(self, method: str, path: str, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]):
+    def add_route(
+        self,
+        method: str,
+        path: str,
+        handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+    ):
         self.app.router.add_route(method, path, handler)
 
     def add_routes(self, routes: Sequence[web.AbstractRouteDef]):

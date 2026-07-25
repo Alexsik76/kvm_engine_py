@@ -1,6 +1,15 @@
 # IP-KVM Orchestrator (Python-based)
 
+![CI](https://github.com/Alexsik76/kvm_engine_py/actions/workflows/ci.yml/badge.svg)
+
 A unified orchestrator for Raspberry Pi 4 IP-KVM, managing hardware-accelerated video streaming and HID emulation.
+
+## Project status
+
+- This is the node software of an IP-KVM system built as a bachelor's diploma project.
+- The hardware stand is no longer assembled, so the software cannot be run or demonstrated at the moment.
+- The repository is kept as a reference implementation: the C++ capture and encoding module, the Python orchestrator, and the RP2040 front-panel firmware.
+- Link to the control plane repository: https://github.com/Alexsik76/kvm-kontrol-plane
 
 ## Architecture Overview
 

@@ -3,7 +3,9 @@ import os
 import shutil
 import time
 from pathlib import Path
+
 import structlog
+
 from app.config import Settings
 
 log = structlog.get_logger()
@@ -51,8 +53,12 @@ class HardwareManager:
         (strings_path / "product").write_text("KVM HID Interface")
 
         # 4. Create HID Functions
-        self._create_hid_function("hid.usb0", protocol=1, subclass=1, report_length=8,  report_desc=_KEYBOARD_REPORT_DESC)
-        self._create_hid_function("hid.usb1", protocol=2, subclass=1, report_length=4,  report_desc=_MOUSE_REPORT_DESC)
+        self._create_hid_function(
+            "hid.usb0", protocol=1, subclass=1, report_length=8, report_desc=_KEYBOARD_REPORT_DESC
+        )
+        self._create_hid_function(
+            "hid.usb1", protocol=2, subclass=1, report_length=4, report_desc=_MOUSE_REPORT_DESC
+        )
 
         # 5. Create Configuration
         config_path = self.gadget_path / "configs" / "c.1"
@@ -78,7 +84,9 @@ class HardwareManager:
         (self.gadget_path / "UDC").write_text(udc_name)
         log.info("hardware_gadget_enabled", udc=udc_name)
 
-    def _create_hid_function(self, name: str, protocol: int, subclass: int, report_length: int, report_desc: bytes):
+    def _create_hid_function(
+        self, name: str, protocol: int, subclass: int, report_length: int, report_desc: bytes
+    ):
         func_path = self.gadget_path / "functions" / name
         func_path.mkdir(parents=True, exist_ok=True)
         (func_path / "protocol").write_text(str(protocol))
@@ -169,7 +177,10 @@ class HardwareManager:
             )
             await proc.wait()
         else:
-            log.info("hardware_v4l2_no_signal_yet", message="Starting services anyway to allow HID wake")
+            log.info(
+                "hardware_v4l2_no_signal_yet",
+                message="Starting services anyway to allow HID wake",
+            )
 
         # 3. Parse detected resolution (fall back to 1280×720)
         width, height = 1280, 720

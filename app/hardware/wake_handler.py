@@ -1,6 +1,8 @@
 import asyncio
+
 import structlog
 from aiohttp import web
+
 from app.hid.auth import validate_access_token
 
 log = structlog.get_logger()

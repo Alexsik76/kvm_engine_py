@@ -1,13 +1,14 @@
 import asyncio
-import structlog
 from contextlib import asynccontextmanager
 from functools import partial
 
-from app.ws.server import WSServer
-from app.hid.server import HIDServer
+import structlog
+
 from app.hardware.front_panel import FrontPanelController
-from app.hardware.video_monitor import VideoSignalMonitor
 from app.hardware.front_panel_ws import front_panel_ws_handler
+from app.hardware.video_monitor import VideoSignalMonitor
+from app.hid.server import HIDServer
+from app.ws.server import WSServer
 
 log = structlog.get_logger()
 

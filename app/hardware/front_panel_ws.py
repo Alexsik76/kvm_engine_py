@@ -1,11 +1,12 @@
 import asyncio
 import json
-import structlog
+
 import aiohttp
+import structlog
 from aiohttp import web
 
-from app.hid.auth import validate_access_token
 from app.hardware.front_panel import FrontPanelController, FrontPanelNotConnectedError
+from app.hid.auth import validate_access_token
 
 log = structlog.get_logger()
 
@@ -74,8 +75,12 @@ async def front_panel_ws_handler(
                         await controller.reset()
                         await ws.send_json({"type": "ack", "cmd": "reset"})
                     else:
-                        log.warning("front_panel_ws_unknown_command", received=cmd_type, user_id=user_id)
-                        await ws.send_json({"type": "error", "reason": "unknown_command", "received": cmd_type})
+                        log.warning(
+                            "front_panel_ws_unknown_command", received=cmd_type, user_id=user_id
+                        )
+                        await ws.send_json(
+                            {"type": "error", "reason": "unknown_command", "received": cmd_type}
+                        )
                 except FrontPanelNotConnectedError:
                     await ws.send_json({"type": "error", "reason": "not_connected"})
                 except Exception as e:

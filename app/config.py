@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
-from pydantic import BaseModel
+
 import structlog
+from pydantic import BaseModel
 
 log = structlog.get_logger()
 

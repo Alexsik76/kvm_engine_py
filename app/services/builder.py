@@ -1,6 +1,6 @@
-import subprocess
 import os
-from pathlib import Path
+import subprocess
+
 import httpx
 import structlog
 
@@ -9,7 +9,9 @@ log = structlog.get_logger()
 class ProjectBuilder:
     def __init__(self, settings):
         self.settings = settings
-        self.include_dir = self.settings.project_root / "src" / "video_engine" / "include" / "nlohmann"
+        self.include_dir = (
+            self.settings.project_root / "src" / "video_engine" / "include" / "nlohmann"
+        )
         self.json_url = "https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp"
 
     async def ensure_dependencies(self):

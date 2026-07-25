@@ -1,16 +1,23 @@
 import asyncio
+import subprocess
+import sys
+import traceback
+
 import click
 import structlog
-import sys
-import subprocess
-import traceback
+
 from app.config import Settings
-from app.services.manager import ServiceManager
-from app.services.builder import ProjectBuilder
 from app.hardware.manager import HardwareManager
+from app.services.builder import ProjectBuilder
+from app.services.manager import ServiceManager
+
 
 def setup_logging():
-    renderer = structlog.dev.ConsoleRenderer() if sys.stderr.isatty() else structlog.processors.JSONRenderer()
+    renderer = (
+        structlog.dev.ConsoleRenderer()
+        if sys.stderr.isatty()
+        else structlog.processors.JSONRenderer()
+    )
     structlog.configure(
         processors=[
             structlog.processors.add_log_level,

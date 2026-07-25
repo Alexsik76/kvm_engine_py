@@ -1,7 +1,8 @@
 import asyncio
 import json
-import structlog
+
 import serial_asyncio
+import structlog
 from serial import SerialException
 
 from app.hardware.video_monitor import VideoSignalMonitor
@@ -172,7 +173,9 @@ class FrontPanelController:
         await self._client.send_command("reset")
 
     def get_status(self) -> dict | None:
-        """Returns a copy of the last received led_status frame. None until the first frame arrives."""
+        """Returns a copy of the last received led_status frame.
+        None until the first frame arrives.
+        """
         return dict(self._last_status) if self._last_status is not None else None
 
     def get_video_status(self) -> str:

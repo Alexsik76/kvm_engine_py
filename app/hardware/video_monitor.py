@@ -1,10 +1,11 @@
-import os
+import asyncio
 import fcntl
+import os
 import select
 import struct
-import asyncio
-import structlog
 from typing import List
+
+import structlog
 
 log = structlog.get_logger()
 
