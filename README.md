@@ -63,7 +63,19 @@ graph TD
 
 ### Prerequisites
 - Raspberry Pi 4 with TC358743 Video Bridge.
-- G++ and Python 3.10+ installed.
+- G++ (or aarch64 cross toolchain) and Python 3.10+ installed.
+
+### C++ Module Build
+
+- **Native build on target device (Raspberry Pi 4)**:
+  ```bash
+  make build
+  ```
+
+- **Cross-compilation for ARM64**:
+  ```bash
+  make build CXX=aarch64-linux-gnu-g++
+  ```
 
 ### Execution
 Run the orchestrator (use `sudo` for hardware access):

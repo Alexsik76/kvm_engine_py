@@ -14,3 +14,14 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - name: Run Ruff check
         run: uvx ruff check .
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross compiler toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-aarch64-linux-gnu
+      - name: Build C++ video engine
+        run: make build CXX=aarch64-linux-gnu-g++
